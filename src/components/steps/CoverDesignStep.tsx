@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, ArrowRight, Upload, Wand2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Upload, Wand2, Loader2 } from 'lucide-react';
 import { useBook } from '@/context/BookContext';
 import { BookCover } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const CoverDesignStep: React.FC = () => {
   const { state, setBookCover, addGeneratedCover, setCurrentStep, canGenerateMoreCovers } = useBook();
@@ -30,11 +31,25 @@ const CoverDesignStep: React.FC = () => {
     setIsGenerating(true);
     
     try {
-      // In a real implementation, this would call the Gemini API
-      // For now, we'll simulate with a timeout and random placeholder image
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Call the Gemini edge function to generate a cover
+      const { data, error } = await supabase.functions.invoke('gemini', {
+        body: {
+          action: 'generateCoverImage',
+          data: {
+            prompt: promptText,
+            title: state.book.title,
+            author: state.book.author
+          }
+        }
+      });
       
-      // Simulate a generated cover
+      if (error) {
+        console.error('Error invoking Gemini function:', error);
+        throw error;
+      }
+      
+      // In a real implementation, we would use the generated image URL
+      // For now, we'll use a random placeholder since we're not actually generating images
       const randomImageID = Math.floor(Math.random() * 1000);
       const newCover: BookCover = {
         id: uuidv4(),
@@ -49,9 +64,10 @@ const CoverDesignStep: React.FC = () => {
       
       toast({
         title: "Cover generated",
-        description: `${3 - (state.coversGenerated + 1)} generations remaining`
+        description: `${3 - (state.coversGenerated + 1)} generations remaining`,
       });
     } catch (error) {
+      console.error('Cover generation error:', error);
       toast({
         title: "Generation failed",
         description: "Failed to generate cover image",
@@ -166,7 +182,10 @@ const CoverDesignStep: React.FC = () => {
                     className="w-full"
                   >
                     {isGenerating ? (
-                      <>Generating...</>
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
                     ) : (
                       <>
                         <Wand2 className="h-4 w-4 mr-2" />
