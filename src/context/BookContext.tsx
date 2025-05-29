@@ -1,8 +1,15 @@
+/** @format */
 
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Book, Chapter, BookCover, SessionState, StepType } from '@/types';
-import { useToast } from "@/components/ui/use-toast";
+import {
+  Book,
+  Chapter,
+  BookCover,
+  SessionState,
+  StepType,
+} from '@/types/book.interface';
+import { useToast } from '@/components/ui/use-toast';
 
 // Default covers as templates
 const DEFAULT_COVERS: BookCover[] = [
@@ -10,25 +17,25 @@ const DEFAULT_COVERS: BookCover[] = [
     id: 'template-1',
     type: 'template',
     url: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=987&q=80',
-    name: 'Minimal White'
+    name: 'Minimal White',
   },
   {
     id: 'template-2',
     type: 'template',
     url: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=987&q=80',
-    name: 'Library'
+    name: 'Library',
   },
   {
     id: 'template-3',
     type: 'template',
     url: 'https://images.unsplash.com/photo-1550399105-c4db5fb85c18?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1171&q=80',
-    name: 'Colorful Abstract'
+    name: 'Colorful Abstract',
   },
   {
     id: 'template-4',
     type: 'template',
     url: 'https://images.unsplash.com/photo-1623018035782-b269248df916?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80',
-    name: 'Minimalist'
+    name: 'Minimalist',
   },
 ];
 
@@ -39,18 +46,21 @@ const initialState: SessionState = {
     author: 'Your Name',
     chapters: [],
     coverImage: null,
-    format: 'PDF'
+    format: 'PDF',
   },
   coversGenerated: 0,
   cachedCovers: [...DEFAULT_COVERS],
-  currentStep: 'articles'
+  currentStep: 'articles',
 };
 
 // Action types
 type Action =
   | { type: 'ADD_ARTICLE'; payload: { url: string } }
   | { type: 'REMOVE_ARTICLE'; payload: { id: string } }
-  | { type: 'UPDATE_CHAPTER'; payload: { id: string; updates: Partial<Chapter> } }
+  | {
+      type: 'UPDATE_CHAPTER';
+      payload: { id: string; updates: Partial<Chapter> };
+    }
   | { type: 'REORDER_CHAPTERS'; payload: { chapters: Chapter[] } }
   | { type: 'SET_BOOK_TITLE'; payload: { title: string } }
   | { type: 'SET_BOOK_AUTHOR'; payload: { author: string } }
@@ -74,95 +84,100 @@ const bookReducer = (state: SessionState, action: Action): SessionState => {
               title: 'Loading...',
               description: 'Fetching article content...',
               url: action.payload.url,
-              isLoading: true
-            }
-          ]
-        }
+              isLoading: true,
+            },
+          ],
+        },
       };
-      
+
     case 'REMOVE_ARTICLE':
       return {
         ...state,
         book: {
           ...state.book,
-          chapters: state.book.chapters.filter(chapter => chapter.id !== action.payload.id)
-        }
+          chapters: state.book.chapters.filter(
+            (chapter) => chapter.id !== action.payload.id
+          ),
+        },
       };
-      
+
     case 'UPDATE_CHAPTER':
       return {
         ...state,
         book: {
           ...state.book,
-          chapters: state.book.chapters.map(chapter => 
+          chapters: state.book.chapters.map((chapter) =>
             chapter.id === action.payload.id
               ? { ...chapter, ...action.payload.updates }
               : chapter
-          )
-        }
+          ),
+        },
       };
-      
+
     case 'REORDER_CHAPTERS':
       return {
         ...state,
         book: {
           ...state.book,
-          chapters: action.payload.chapters
-        }
+          chapters: action.payload.chapters,
+        },
       };
-      
+
     case 'SET_BOOK_TITLE':
       return {
         ...state,
         book: {
           ...state.book,
-          title: action.payload.title
-        }
+          title: action.payload.title,
+        },
       };
-      
+
     case 'SET_BOOK_AUTHOR':
       return {
         ...state,
         book: {
           ...state.book,
-          author: action.payload.author
-        }
+          author: action.payload.author,
+        },
       };
-      
+
     case 'SET_BOOK_FORMAT':
       return {
         ...state,
         book: {
           ...state.book,
-          format: action.payload.format
-        }
+          format: action.payload.format,
+        },
       };
-      
+
     case 'SET_BOOK_COVER':
       return {
         ...state,
         book: {
           ...state.book,
-          coverImage: action.payload.cover
-        }
+          coverImage: action.payload.cover,
+        },
       };
-      
+
     case 'ADD_GENERATED_COVER':
       return {
         ...state,
         coversGenerated: state.coversGenerated + 1,
         cachedCovers: [
           action.payload.cover,
-          ...state.cachedCovers.filter(cover => cover.type !== 'generated' || cover.id !== action.payload.cover.id)
-        ]
+          ...state.cachedCovers.filter(
+            (cover) =>
+              cover.type !== 'generated' || cover.id !== action.payload.cover.id
+          ),
+        ],
       };
-      
+
     case 'SET_CURRENT_STEP':
       return {
         ...state,
-        currentStep: action.payload.step
+        currentStep: action.payload.step,
       };
-      
+
     default:
       return state;
   }
@@ -187,10 +202,12 @@ interface BookContextType {
 const BookContext = createContext<BookContextType | undefined>(undefined);
 
 // Provider component
-export const BookProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const BookProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [state, dispatch] = useReducer(bookReducer, initialState);
   const { toast } = useToast();
-  
+
   const addArticle = (url: string) => {
     // Basic URL validation
     try {
@@ -198,61 +215,61 @@ export const BookProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       dispatch({ type: 'ADD_ARTICLE', payload: { url } });
     } catch (error) {
       toast({
-        title: "Invalid URL",
-        description: "Please enter a valid URL",
-        variant: "destructive"
+        title: 'Invalid URL',
+        description: 'Please enter a valid URL',
+        variant: 'destructive',
       });
     }
   };
-  
+
   const removeArticle = (id: string) => {
     dispatch({ type: 'REMOVE_ARTICLE', payload: { id } });
   };
-  
+
   const updateChapter = (id: string, updates: Partial<Chapter>) => {
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id, updates } });
   };
-  
+
   const reorderChapters = (chapters: Chapter[]) => {
     dispatch({ type: 'REORDER_CHAPTERS', payload: { chapters } });
   };
-  
+
   const setBookTitle = (title: string) => {
     dispatch({ type: 'SET_BOOK_TITLE', payload: { title } });
   };
-  
+
   const setBookAuthor = (author: string) => {
     dispatch({ type: 'SET_BOOK_AUTHOR', payload: { author } });
   };
-  
+
   const setBookFormat = (format: 'PDF' | 'EPUB') => {
     dispatch({ type: 'SET_BOOK_FORMAT', payload: { format } });
   };
-  
+
   const setBookCover = (cover: BookCover) => {
     dispatch({ type: 'SET_BOOK_COVER', payload: { cover } });
   };
-  
+
   const addGeneratedCover = (cover: BookCover) => {
     // Check if we've reached the generation limit
     if (state.coversGenerated >= 3) {
       toast({
-        title: "Generation limit reached",
-        description: "You can only generate 3 covers per session",
-        variant: "destructive"
+        title: 'Generation limit reached',
+        description: 'You can only generate 3 covers per session',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     dispatch({ type: 'ADD_GENERATED_COVER', payload: { cover } });
   };
-  
+
   const setCurrentStep = (step: StepType) => {
     dispatch({ type: 'SET_CURRENT_STEP', payload: { step } });
   };
-  
+
   const canGenerateMoreCovers = state.coversGenerated < 3;
-  
+
   const contextValue: BookContextType = {
     state,
     addArticle,
@@ -265,13 +282,11 @@ export const BookProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setBookCover,
     addGeneratedCover,
     setCurrentStep,
-    canGenerateMoreCovers
+    canGenerateMoreCovers,
   };
-  
+
   return (
-    <BookContext.Provider value={contextValue}>
-      {children}
-    </BookContext.Provider>
+    <BookContext.Provider value={contextValue}>{children}</BookContext.Provider>
   );
 };
 

@@ -1,3 +1,4 @@
+/** @format */
 
 export interface Chapter {
   id: string;
@@ -32,7 +33,12 @@ export interface Book {
   format: 'PDF' | 'EPUB';
 }
 
-export type StepType = 'articles' | 'chapters' | 'cover' | 'preview';
+export type StepType =
+  | 'articles'
+  | 'chapters'
+  | 'cover'
+  | 'preview'
+  | 'publish';
 
 export interface SessionState {
   book: Book;

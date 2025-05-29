@@ -1,25 +1,26 @@
+/** @format */
 
-import { Chapter, Media } from '@/types';
+import { Chapter, Media } from '@/types/book.interface';
 import { supabase } from '@/integrations/supabase/client';
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 1000;
 
 export const fetchArticleContent = async (
-  url: string, 
+  url: string,
   retryCount = 0
 ): Promise<{ content: string; media: Media[] } | { error: string }> => {
   try {
     // In a real implementation, this would call a backend API to fetch and parse the article
     // For now, we'll simulate the process with a timeout
-    
+
     // Simulate some failures to demonstrate retry logic
     if (Math.random() > 0.8 && retryCount < MAX_RETRIES - 1) {
       throw new Error('Simulated fetch failure');
     }
-    
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
     // This is where we'd parse the article content and extract media
     // For now, return dummy content
     return {
@@ -32,26 +33,32 @@ export const fetchArticleContent = async (
         {
           type: 'image',
           url: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1741&q=80',
-          alt: 'Sample image from article'
-        }
-      ]
+          alt: 'Sample image from article',
+        },
+      ],
     };
-    
   } catch (error) {
     // Implement retry logic
     if (retryCount < MAX_RETRIES) {
       console.log(`Retry ${retryCount + 1}/${MAX_RETRIES} for URL: ${url}`);
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+      await new Promise((resolve) =>
+        setTimeout(resolve, RETRY_DELAY * (retryCount + 1))
+      );
       return fetchArticleContent(url, retryCount + 1);
     }
-    
+
     return {
-      error: `Failed to fetch article after ${MAX_RETRIES} attempts: ${(error as Error).message}`
+      error: `Failed to fetch article after ${MAX_RETRIES} attempts: ${
+        (error as Error).message
+      }`,
     };
   }
 };
 
-export const generateChapterSummary = async (title: string, content: string): Promise<string> => {
+export const generateChapterSummary = async (
+  title: string,
+  content: string
+): Promise<string> => {
   try {
     // Call the Gemini edge function to generate a summary
     const { data, error } = await supabase.functions.invoke('gemini', {
@@ -59,17 +66,20 @@ export const generateChapterSummary = async (title: string, content: string): Pr
         action: 'generateChapterSummary',
         data: {
           title,
-          content
-        }
-      }
+          content,
+        },
+      },
     });
-    
+
     if (error) {
       console.error('Error invoking Gemini function:', error);
       throw error;
     }
-    
-    return data?.summary || 'Failed to generate summary. You can edit this description manually.';
+
+    return (
+      data?.summary ||
+      'Failed to generate summary. You can edit this description manually.'
+    );
   } catch (error) {
     console.error('Error generating chapter summary:', error);
     return 'Failed to generate summary. You can edit this description manually.';
@@ -88,10 +98,10 @@ export const extractTitleFromUrl = (url: string): string => {
         .replace(/[-_]/g, ' ')
         .replace(/\.\w+$/, '') // Remove file extensions
         .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
     }
-    
+
     // Fallback to domain name if path doesn't provide a good title
     return urlObj.hostname
       .replace(/^www\./, '')
@@ -99,9 +109,8 @@ export const extractTitleFromUrl = (url: string): string => {
       .slice(0, -1)
       .join(' ')
       .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
-      
   } catch (error) {
     return 'Untitled Article';
   }
