@@ -115,9 +115,81 @@ serve(async (req) => {
 });
 
 function generatePDFContent(book: any): string {
-  // This is a simplified text representation of what would be PDF content
-  // In a real implementation, you'd use libraries like jsPDF or Puppeteer
-  let content = `%PDF-1.4
+  // Calculate total content length for proper PDF structure
+  let totalContentLength = 0;
+  let processedChapters = '';
+  
+  book.chapters.forEach((chapter: any, index: number) => {
+    const chapterNum = index + 1;
+    
+    // Convert HTML content to plain text for PDF
+    const plainTextContent = chapter.content
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(/&nbsp;/g, ' ') // Replace HTML entities
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .trim();
+    
+    // Calculate lines needed for content (approximately 80 characters per line)
+    const contentLines = Math.ceil(plainTextContent.length / 80);
+    const linesPerPage = 35; // Approximate lines per page
+    const pagesNeeded = Math.ceil((contentLines + 5) / linesPerPage); // +5 for title and spacing
+    
+    totalContentLength += plainTextContent.length + 500; // Add space for formatting
+    
+    // Format chapter content with proper spacing
+    processedChapters += `
+    % Chapter ${chapterNum} - New Page
+    q
+    1 0 0 1 50 ${750 - (pagesNeeded > 1 ? 0 : 0)} cm
+    BT
+    /F1 20 Tf
+    0 0 0 rg
+    (Chapter ${chapterNum}: ${chapter.title.replace(/[()\\]/g, '\\$&')}) Tj
+    0 -40 Td
+    /F1 12 Tf
+    0.2 0.2 0.2 rg
+`;
+    
+    // Split content into manageable chunks for proper PDF formatting
+    const contentChunks = plainTextContent.match(/.{1,80}/g) || [];
+    let currentY = -60;
+    let currentPage = 1;
+    
+    contentChunks.forEach((chunk: string, chunkIndex: number) => {
+      // Check if we need a new page (approximately 35 lines per page)
+      if (currentY <= -650 && chunkIndex < contentChunks.length - 1) {
+        processedChapters += `
+        ET
+        Q
+        showpage
+        % New page for continuing content
+        q
+        1 0 0 1 50 750 cm
+        BT
+        /F1 12 Tf
+        0.2 0.2 0.2 rg
+`;
+        currentY = -20;
+        currentPage++;
+      }
+      
+      processedChapters += `    0 ${currentY} Td (${chunk.replace(/[()\\]/g, '\\$&')}) Tj\n`;
+      currentY -= 15;
+    });
+    
+    processedChapters += `
+    ET
+    Q
+    showpage
+`;
+  });
+
+  // Create proper PDF structure with multiple pages
+  const pdfHeader = `%PDF-1.4
 1 0 obj
 <<
 /Type /Catalog
@@ -139,75 +211,68 @@ endobj
 /Parent 2 0 R
 /MediaBox [0 0 612 792]
 /Contents 4 0 R
+/Resources <<
+  /Font <<
+    /F1 5 0 R
+  >>
+>>
 >>
 endobj
 
 4 0 obj
 <<
-/Length ${calculateContentLength(book)}
+/Length ${totalContentLength + 2000}
 >>
 stream
+q
+1 0 0 1 50 750 cm
 BT
-/F1 24 Tf
-50 750 Td
-(${book.title}) Tj
-0 -30 Td
-/F1 16 Tf
-(by ${book.author}) Tj
-0 -60 Td
-`;
-
-  // Add chapters with content
-  book.chapters.forEach((chapter: any, index: number) => {
-    content += `
-0 -40 Td
+/F1 28 Tf
+0 0 0 rg
+(${book.title.replace(/[()\\]/g, '\\$&')}) Tj
+0 -50 Td
 /F1 18 Tf
-(Chapter ${index + 1}: ${chapter.title}) Tj
-0 -30 Td
-/F1 12 Tf
-`;
-    
-    // Convert HTML content to plain text for PDF (simplified)
-    const plainTextContent = chapter.content
-      .replace(/<[^>]*>/g, '') // Remove HTML tags
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim()
-      .substring(0, 2000); // Limit content length for PDF
-    
-    // Split content into lines for PDF formatting
-    const lines = plainTextContent.match(/.{1,80}/g) || [];
-    lines.forEach((line: string) => {
-      content += `0 -15 Td (${line.replace(/[()\\]/g, '\\$&')}) Tj\n`;
-    });
-    
-    // Add page break between chapters (simplified)
-    if (index < book.chapters.length - 1) {
-      content += `0 -100 Td (--- New Page ---) Tj\n`;
-    }
-  });
-
-  content += `
+0.3 0.3 0.3 rg
+(by ${book.author.replace(/[()\\]/g, '\\$&')}) Tj
+0 -80 Td
+/F1 14 Tf
+0.5 0.5 0.5 rg
+(Generated Book - ${book.chapters.length} Chapters) Tj
 ET
+Q
+showpage
+
+${processedChapters}
+
 endstream
 endobj
 
+5 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
+>>
+endobj
+
 xref
-0 5
+0 6
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000214 00000 n 
+0000000300 00000 n 
+0000${String(totalContentLength + 2500).padStart(10, '0')} 00000 n 
 trailer
 <<
-/Size 5
+/Size 6
 /Root 1 0 R
 >>
 startxref
-${1000 + book.chapters.length * 100}
+${totalContentLength + 2600}
 %%EOF`;
 
-  return content;
+  return pdfHeader;
 }
 
 function generateEPUBContent(book: any): string {
@@ -242,6 +307,7 @@ function generateEPUBContent(book: any): string {
       border-bottom: 2px solid #333; 
       padding-bottom: 0.5em;
       page-break-after: avoid;
+      margin-bottom: 1.5em;
     }
     p { 
       margin: 1em 0; 
@@ -252,6 +318,7 @@ function generateEPUBContent(book: any): string {
       color: #666;
       text-transform: uppercase;
       letter-spacing: 2px;
+      margin-bottom: 0.5em;
     }
   </style>
 </head>
@@ -360,13 +427,4 @@ function formatContentForEPUB(content: string): string {
     .replace(/^/, '<p>') // Add opening paragraph
     .replace(/$/, '</p>') // Add closing paragraph
     .trim();
-}
-
-function calculateContentLength(book: any): number {
-  // Calculate approximate content length for PDF
-  let length = book.title.length + book.author.length + 200;
-  book.chapters.forEach((chapter: any) => {
-    length += chapter.title.length + (chapter.content?.length || 0) + 100;
-  });
-  return length;
 }
