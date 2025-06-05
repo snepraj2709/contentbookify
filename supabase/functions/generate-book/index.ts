@@ -78,12 +78,14 @@ serve(async (req)=>{
       mimeType = 'application/epub+zip';
       fileExtension = 'epub';
     }
+    const PDFSHIFT_API_KEY = Deno.env.get('PDFSHIFT_API_KEY');
+
     // Convert content to base64 for download
     const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/html', {
   method: 'POST',
-  headers: {
-    'Authorization': 'Basic ' + btoa('your_api_key:'),
+   headers: {
     'Content-Type': 'application/json',
+    'X-API-Key': PDFSHIFT_API_KEY
   },
   body: JSON.stringify({
     source: generatePDFContent(book), // HTML
