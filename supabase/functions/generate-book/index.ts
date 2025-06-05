@@ -1,120 +1,123 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
-
-serve(async (req) => {
+serve(async (req)=>{
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      headers: corsHeaders
+    });
   }
-
   try {
     const { book } = await req.json();
-    
     if (!book) {
       throw new Error('Book data is required');
     }
-
     console.log('Generating book:', book.title, 'Format:', book.format);
-
     // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = createClient(supabaseUrl, supabaseKey);
-
     // Fetch content for each chapter
-    const chaptersWithContent = await Promise.all(
-      book.chapters.map(async (chapter: any) => {
-        try {
-          console.log(`Fetching content for chapter: ${chapter.title}`);
-          
-          // Call the fetch-article function to get the content
-          const { data, error } = await supabase.functions.invoke('fetch-article', {
-            body: { url: chapter.url }
-          });
-          
-          if (error) {
-            console.error(`Error fetching content for ${chapter.url}:`, error);
-            return {
-              ...chapter,
-              content: `<p>Content could not be fetched for this chapter. URL: ${chapter.url}</p>`
-            };
+    const chaptersWithContent = await Promise.all(book.chapters.map(async (chapter)=>{
+      try {
+        console.log(`Fetching content for chapter: ${chapter.title}`);
+        // Call the fetch-article function to get the content
+        const { data, error } = await supabase.functions.invoke('fetch-article', {
+          body: {
+            url: chapter.url
           }
-          
-          if (!data.success) {
-            console.error(`Failed to fetch content for ${chapter.url}:`, data.error);
-            return {
-              ...chapter,
-              content: `<p>Content could not be fetched for this chapter. URL: ${chapter.url}</p>`
-            };
-          }
-          
-          return {
-            ...chapter,
-            content: data.content || '<p>No content available</p>',
-            media: data.media || []
-          };
-          
-        } catch (fetchError) {
-          console.error(`Exception fetching content for ${chapter.url}:`, fetchError);
+        });
+        if (error) {
+          console.error(`Error fetching content for ${chapter.url}:`, error);
           return {
             ...chapter,
             content: `<p>Content could not be fetched for this chapter. URL: ${chapter.url}</p>`
           };
         }
-      })
-    );
-
+        if (!data.success) {
+          console.error(`Failed to fetch content for ${chapter.url}:`, data.error);
+          return {
+            ...chapter,
+            content: `<p>Content could not be fetched for this chapter. URL: ${chapter.url}</p>`
+          };
+        }
+        return {
+          ...chapter,
+          content: data.content || '<p>No content available</p>',
+          media: data.media || []
+        };
+      } catch (fetchError) {
+        console.error(`Exception fetching content for ${chapter.url}:`, fetchError);
+        return {
+          ...chapter,
+          content: `<p>Content could not be fetched for this chapter. URL: ${chapter.url}</p>`
+        };
+      }
+    }));
     // Create book content based on format
     let bookContent = '';
     let mimeType = '';
     let fileExtension = '';
-
     if (book.format === 'PDF') {
-      bookContent = generatePDFContent({ ...book, chapters: chaptersWithContent });
+      bookContent = generatePDFContent({
+        ...book,
+        chapters: chaptersWithContent
+      });
       mimeType = 'application/pdf';
       fileExtension = 'pdf';
     } else if (book.format === 'EPUB') {
-      bookContent = generateEPUBContent({ ...book, chapters: chaptersWithContent });
+      bookContent = generateEPUBContent({
+        ...book,
+        chapters: chaptersWithContent
+      });
       mimeType = 'application/epub+zip';
       fileExtension = 'epub';
     }
-
     // Convert content to base64 for download
-    const encoder = new TextEncoder();
-    const data = encoder.encode(bookContent);
-    const base64Content = btoa(String.fromCharCode(...data));
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        fileName: `${book.title.replace(/\s+/g, '-').toLowerCase()}.${fileExtension}`,
-        content: base64Content,
-        mimeType: mimeType
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
-  } catch (error) {
-    console.error('Error generating book:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
-  }
+    const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/html', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Basic ' + btoa('your_api_key:'),
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    source: generatePDFContent(book), // HTML
+  }),
 });
 
-function generatePDFContent(book: any): string {
+const pdfBuffer = new Uint8Array(await pdfResponse.arrayBuffer());
+const base64Content = btoa(String.fromCharCode(...pdfBuffer));
+
+    return new Response(JSON.stringify({
+      success: true,
+      fileName: `${book.title.replace(/\s+/g, '-').toLowerCase()}.${fileExtension}`,
+      content: base64Content,
+      mimeType: mimeType
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('Error generating book:', error);
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+});
+function generatePDFContent(book) {
   // Create a simple HTML-to-PDF conversion for better text handling
   let htmlContent = `
 <!DOCTYPE html>
@@ -187,12 +190,10 @@ function generatePDFContent(book: any): string {
         <div class="book-info">Generated Book - ${book.chapters.length} Chapters</div>
     </div>
 `;
-
   // Add each chapter
-  book.chapters.forEach((chapter: any, index: number) => {
+  book.chapters.forEach((chapter, index)=>{
     const chapterNum = index + 1;
     const cleanContent = cleanHtmlContent(chapter.content);
-    
     htmlContent += `
     <div class="chapter">
         <div class="chapter-title">Chapter ${chapterNum}: ${escapeHtml(chapter.title)}</div>
@@ -202,27 +203,22 @@ function generatePDFContent(book: any): string {
     </div>
 `;
   });
-
   htmlContent += `
 </body>
 </html>`;
-
   return htmlContent;
 }
-
-function generateEPUBContent(book: any): string {
+function generateEPUBContent(book) {
   // Generate EPUB with proper HTML content structure
   let tocEntries = '';
   let manifestEntries = '';
   let spineEntries = '';
   let chaptersHtml = '';
-
-  book.chapters.forEach((chapter: any, index: number) => {
+  book.chapters.forEach((chapter, index)=>{
     const chapterNum = index + 1;
     tocEntries += `      <li><a href="chapter${chapterNum}.xhtml">Chapter ${chapterNum}: ${escapeHtml(chapter.title)}</a></li>\n`;
     manifestEntries += `    <item id="chapter${chapterNum}" href="chapter${chapterNum}.xhtml" media-type="application/xhtml+xml"/>\n`;
     spineEntries += `    <itemref idref="chapter${chapterNum}"/>\n`;
-    
     // Create chapter HTML with proper formatting
     chaptersHtml += `
 <!-- Chapter ${chapterNum} -->
@@ -268,7 +264,7 @@ function generateEPUBContent(book: any): string {
   ${chapter.media && chapter.media.length > 0 ? `
   <div class="chapter-media">
     <h3>Media</h3>
-    ${chapter.media.map((media: any) => {
+    ${chapter.media.map((media)=>{
       if (media.type === 'image') {
         return `<img src="${media.url}" alt="${media.alt || ''}" style="max-width: 100%; height: auto; margin: 1em 0;" />`;
       }
@@ -280,7 +276,6 @@ function generateEPUBContent(book: any): string {
 </html>
 `;
   });
-
   return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -348,36 +343,22 @@ ${tocEntries}    </ol>
 
 ${chaptersHtml}`;
 }
-
-function formatContentForEPUB(content: string): string {
+function formatContentForEPUB(content) {
   // Clean and format HTML content for EPUB
   return cleanHtmlContent(content);
 }
-
-function cleanHtmlContent(content: string): string {
+function cleanHtmlContent(content) {
   // Clean and sanitize HTML content
-  return content
-    .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove scripts
-    .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove inline styles
-    .replace(/style="[^"]*"/gi, '') // Remove style attributes
-    .replace(/<(div|span)([^>]*)>/gi, '<p$2>') // Convert divs/spans to paragraphs
-    .replace(/<\/(div|span)>/gi, '</p>') // Close paragraph tags
-    .replace(/<p[^>]*>\s*<\/p>/gi, '') // Remove empty paragraphs
-    .replace(/\n\s*\n/g, '</p>\n<p>') // Convert double line breaks to paragraph breaks
-    .replace(/&nbsp;/g, ' ') // Replace HTML entities
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .trim();
+  return content.replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove scripts
+  .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove inline styles
+  .replace(/style="[^"]*"/gi, '') // Remove style attributes
+  .replace(/<(div|span)([^>]*)>/gi, '<p$2>') // Convert divs/spans to paragraphs
+  .replace(/<\/(div|span)>/gi, '</p>') // Close paragraph tags
+  .replace(/<p[^>]*>\s*<\/p>/gi, '') // Remove empty paragraphs
+  .replace(/\n\s*\n/g, '</p>\n<p>') // Convert double line breaks to paragraph breaks
+  .replace(/&nbsp;/g, ' ') // Replace HTML entities
+  .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
 }
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+function escapeHtml(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
-
