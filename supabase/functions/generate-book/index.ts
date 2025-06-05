@@ -23,19 +23,65 @@ serve(async (req) => {
 
     console.log('Generating book:', book.title, 'Format:', book.format);
 
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch content for each chapter
+    const chaptersWithContent = await Promise.all(
+      book.chapters.map(async (chapter: any) => {
+        try {
+          console.log(`Fetching content for chapter: ${chapter.title}`);
+          
+          // Call the fetch-article function to get the content
+          const { data, error } = await supabase.functions.invoke('fetch-article', {
+            body: { url: chapter.url }
+          });
+          
+          if (error) {
+            console.error(`Error fetching content for ${chapter.url}:`, error);
+            return {
+              ...chapter,
+              content: `<p>Content could not be fetched for this chapter. URL: ${chapter.url}</p>`
+            };
+          }
+          
+          if (!data.success) {
+            console.error(`Failed to fetch content for ${chapter.url}:`, data.error);
+            return {
+              ...chapter,
+              content: `<p>Content could not be fetched for this chapter. URL: ${chapter.url}</p>`
+            };
+          }
+          
+          return {
+            ...chapter,
+            content: data.content || '<p>No content available</p>',
+            media: data.media || []
+          };
+          
+        } catch (fetchError) {
+          console.error(`Exception fetching content for ${chapter.url}:`, fetchError);
+          return {
+            ...chapter,
+            content: `<p>Content could not be fetched for this chapter. URL: ${chapter.url}</p>`
+          };
+        }
+      })
+    );
+
     // Create book content based on format
     let bookContent = '';
     let mimeType = '';
     let fileExtension = '';
 
     if (book.format === 'PDF') {
-      // Generate PDF-like content (in a real implementation, you'd use a PDF library)
-      bookContent = generatePDFContent(book);
+      bookContent = generatePDFContent({ ...book, chapters: chaptersWithContent });
       mimeType = 'application/pdf';
       fileExtension = 'pdf';
     } else if (book.format === 'EPUB') {
-      // Generate EPUB-like content (in a real implementation, you'd use an EPUB library)
-      bookContent = generateEPUBContent(book);
+      bookContent = generateEPUBContent({ ...book, chapters: chaptersWithContent });
       mimeType = 'application/epub+zip';
       fileExtension = 'epub';
     }
@@ -71,7 +117,7 @@ serve(async (req) => {
 function generatePDFContent(book: any): string {
   // This is a simplified text representation of what would be PDF content
   // In a real implementation, you'd use libraries like jsPDF or Puppeteer
-  return `%PDF-1.4
+  let content = `%PDF-1.4
 1 0 obj
 <<
 /Type /Catalog
@@ -98,21 +144,49 @@ endobj
 
 4 0 obj
 <<
-/Length ${book.title.length + book.author.length + 100}
+/Length ${calculateContentLength(book)}
 >>
 stream
 BT
 /F1 24 Tf
-100 700 Td
+50 750 Td
 (${book.title}) Tj
 0 -30 Td
 /F1 16 Tf
 (by ${book.author}) Tj
-0 -50 Td
+0 -60 Td
+`;
+
+  // Add chapters with content
+  book.chapters.forEach((chapter: any, index: number) => {
+    content += `
+0 -40 Td
+/F1 18 Tf
+(Chapter ${index + 1}: ${chapter.title}) Tj
+0 -30 Td
 /F1 12 Tf
-${book.chapters.map((chapter: any, index: number) => 
-  `0 -20 Td (${index + 1}. ${chapter.title}) Tj`
-).join('\n')}
+`;
+    
+    // Convert HTML content to plain text for PDF (simplified)
+    const plainTextContent = chapter.content
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim()
+      .substring(0, 2000); // Limit content length for PDF
+    
+    // Split content into lines for PDF formatting
+    const lines = plainTextContent.match(/.{1,80}/g) || [];
+    lines.forEach((line: string) => {
+      content += `0 -15 Td (${line.replace(/[()\\]/g, '\\$&')}) Tj\n`;
+    });
+    
+    // Add page break between chapters (simplified)
+    if (index < book.chapters.length - 1) {
+      content += `0 -100 Td (--- New Page ---) Tj\n`;
+    }
+  });
+
+  content += `
 ET
 endstream
 endobj
@@ -130,13 +204,81 @@ trailer
 /Root 1 0 R
 >>
 startxref
-${500 + book.chapters.length * 50}
+${1000 + book.chapters.length * 100}
 %%EOF`;
+
+  return content;
 }
 
 function generateEPUBContent(book: any): string {
-  // This is a simplified text representation of what would be EPUB content
-  // In a real implementation, you'd create a proper EPUB structure with ZIP
+  // Generate EPUB with proper HTML content structure
+  let tocEntries = '';
+  let manifestEntries = '';
+  let spineEntries = '';
+  let chaptersHtml = '';
+
+  book.chapters.forEach((chapter: any, index: number) => {
+    const chapterNum = index + 1;
+    tocEntries += `      <li><a href="chapter${chapterNum}.xhtml">Chapter ${chapterNum}: ${chapter.title}</a></li>\n`;
+    manifestEntries += `    <item id="chapter${chapterNum}" href="chapter${chapterNum}.xhtml" media-type="application/xhtml+xml"/>\n`;
+    spineEntries += `    <itemref idref="chapter${chapterNum}"/>\n`;
+    
+    // Create chapter HTML with proper formatting
+    chaptersHtml += `
+<!-- Chapter ${chapterNum} -->
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>Chapter ${chapterNum}: ${chapter.title}</title>
+  <style>
+    body { 
+      font-family: serif; 
+      line-height: 1.6; 
+      margin: 2em;
+      page-break-before: always;
+    }
+    h1 { 
+      color: #333; 
+      border-bottom: 2px solid #333; 
+      padding-bottom: 0.5em;
+      page-break-after: avoid;
+    }
+    p { 
+      margin: 1em 0; 
+      text-align: justify;
+    }
+    .chapter-number {
+      font-size: 0.8em;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="chapter-number">Chapter ${chapterNum}</div>
+  <h1>${chapter.title}</h1>
+  
+  <div class="chapter-content">
+    ${formatContentForEPUB(chapter.content)}
+  </div>
+  
+  ${chapter.media && chapter.media.length > 0 ? `
+  <div class="chapter-media">
+    <h3>Media</h3>
+    ${chapter.media.map((media: any) => {
+      if (media.type === 'image') {
+        return `<img src="${media.url}" alt="${media.alt || ''}" style="max-width: 100%; height: auto; margin: 1em 0;" />`;
+      }
+      return '';
+    }).join('')}
+  </div>
+  ` : ''}
+</body>
+</html>
+`;
+  });
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -144,51 +286,87 @@ function generateEPUBContent(book: any): string {
     <dc:creator>${book.author}</dc:creator>
     <dc:language>en</dc:language>
     <dc:identifier id="uid">${Date.now()}</dc:identifier>
+    <meta property="dcterms:modified">${new Date().toISOString()}</meta>
   </metadata>
   
   <manifest>
     <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
-    ${book.chapters.map((chapter: any, index: number) => 
-      `<item id="chapter${index + 1}" href="chapter${index + 1}.xhtml" media-type="application/xhtml+xml"/>`
-    ).join('\n    ')}
-  </manifest>
+${manifestEntries}  </manifest>
   
   <spine>
-    ${book.chapters.map((chapter: any, index: number) => 
-      `<itemref idref="chapter${index + 1}"/>`
-    ).join('\n    ')}
-  </spine>
+${spineEntries}  </spine>
 </package>
 
 <!-- Table of Contents -->
-<html xmlns="http://www.w3.org/1999/xhtml">
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 <head>
-  <title>${book.title}</title>
+  <title>${book.title} - Table of Contents</title>
+  <style>
+    body { 
+      font-family: serif; 
+      margin: 2em;
+    }
+    h1 { 
+      color: #333; 
+      text-align: center;
+    }
+    h2 {
+      color: #666;
+      text-align: center;
+      font-style: italic;
+    }
+    nav ol { 
+      list-style: none; 
+      padding: 0;
+    }
+    nav li { 
+      margin: 1em 0; 
+      padding: 0.5em;
+      border-bottom: 1px dotted #ccc;
+    }
+    nav a { 
+      text-decoration: none; 
+      color: #333;
+    }
+    nav a:hover { 
+      color: #666; 
+    }
+  </style>
 </head>
 <body>
   <h1>${book.title}</h1>
   <h2>by ${book.author}</h2>
-  <nav>
+  <nav epub:type="toc">
     <ol>
-      ${book.chapters.map((chapter: any, index: number) => 
-        `<li><a href="chapter${index + 1}.xhtml">${chapter.title}</a></li>`
-      ).join('\n      ')}
-    </ol>
+${tocEntries}    </ol>
   </nav>
 </body>
 </html>
 
-<!-- Chapters -->
-${book.chapters.map((chapter: any, index: number) => `
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-  <title>${chapter.title}</title>
-</head>
-<body>
-  <h1>${chapter.title}</h1>
-  <p>${chapter.description}</p>
-  ${chapter.content ? `<div>${chapter.content}</div>` : ''}
-</body>
-</html>
-`).join('\n')}`;
+${chaptersHtml}`;
+}
+
+function formatContentForEPUB(content: string): string {
+  // Clean and format HTML content for EPUB
+  return content
+    .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove scripts
+    .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove inline styles
+    .replace(/style="[^"]*"/gi, '') // Remove style attributes
+    .replace(/<(div|span)([^>]*)>/gi, '<p$2>') // Convert divs/spans to paragraphs
+    .replace(/<\/(div|span)>/gi, '</p>') // Close paragraph tags
+    .replace(/<p[^>]*>\s*<\/p>/gi, '') // Remove empty paragraphs
+    .replace(/\n\s*\n/g, '</p>\n<p>') // Convert double line breaks to paragraph breaks
+    .replace(/^/, '<p>') // Add opening paragraph
+    .replace(/$/, '</p>') // Add closing paragraph
+    .trim();
+}
+
+function calculateContentLength(book: any): number {
+  // Calculate approximate content length for PDF
+  let length = book.title.length + book.author.length + 200;
+  book.chapters.forEach((chapter: any) => {
+    length += chapter.title.length + (chapter.content?.length || 0) + 100;
+  });
+  return length;
 }
