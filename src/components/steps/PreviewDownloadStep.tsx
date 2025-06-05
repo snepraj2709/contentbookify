@@ -7,6 +7,7 @@ import { ArrowLeft, Book, Download, FileText, Loader2 } from 'lucide-react';
 import { useBook } from '@/context/BookContext';
 import { useToast } from '@/components/ui/use-toast';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { supabase } from '@/integrations/supabase/client';
 
 const PreviewDownloadStep: React.FC = () => {
   const { state, setBookFormat, setCurrentStep } = useBook();
@@ -17,42 +18,53 @@ const PreviewDownloadStep: React.FC = () => {
     setIsDownloading(true);
     
     try {
-      // In a real implementation, this would call a backend API to generate the book
-      // For now, we'll simulate with a timeout
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log('Starting book generation...', state.book);
+      
+      // Call the Supabase edge function to generate the book
+      const { data, error } = await supabase.functions.invoke('generate-book', {
+        body: {
+          book: state.book
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (!data.success) {
+        throw new Error('Failed to generate book');
+      }
+
+      console.log('Book generated successfully:', data.fileName);
+
+      // Convert base64 content back to blob and download
+      const binaryString = atob(data.content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const blob = new Blob([bytes], { type: data.mimeType });
+      const url = URL.createObjectURL(blob);
+      
+      // Create download link and trigger download
+      const element = document.createElement('a');
+      element.href = url;
+      element.download = data.fileName;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      
+      // Clean up the URL object
+      URL.revokeObjectURL(url);
       
       toast({
         title: "Book Created",
         description: `Your ${state.book.format} book has been successfully created and downloaded.`
       });
       
-      // Simulate file download by creating a text file
-      const element = document.createElement('a');
-      const fileType = state.book.format === 'PDF' ? 'pdf' : 'epub';
-      const fileName = `${state.book.title.replace(/\s+/g, '-').toLowerCase()}.${fileType}`;
-      
-      // In a real app, this would be a blob URL to the actual file
-      // For this example, we're just creating a text file with info about the book
-      const bookInfo = `
-        Title: ${state.book.title}
-        Author: ${state.book.author}
-        Format: ${state.book.format}
-        Chapters: ${state.book.chapters.length}
-        
-        Table of Contents:
-        ${state.book.chapters.map((chapter, index) => `${index + 1}. ${chapter.title}`).join('\n')}
-        
-        Note: This is a simulated download. In a real app, this would be an actual ${state.book.format} file.
-      `;
-      
-      const file = new Blob([bookInfo], { type: 'text/plain' });
-      element.href = URL.createObjectURL(file);
-      element.download = fileName;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
-      
     } catch (error) {
+      console.error('Download error:', error);
       toast({
         title: "Download failed",
         description: "There was an error creating your book. Please try again.",
@@ -148,7 +160,7 @@ const PreviewDownloadStep: React.FC = () => {
               <div className="mt-4">
                 <Button
                   onClick={handleDownload}
-                  disabled={isDownloading}
+                  disabled={isDownloading || state.book.chapters.length === 0}
                   className="w-full py-6"
                 >
                   {isDownloading ? (
@@ -167,6 +179,9 @@ const PreviewDownloadStep: React.FC = () => {
               
               <div className="mt-2 text-sm text-muted-foreground text-center">
                 <p>Your book will be saved to your downloads folder</p>
+                {state.book.chapters.length === 0 && (
+                  <p className="text-orange-600 mt-1">Add some chapters first to generate your book</p>
+                )}
               </div>
             </CardContent>
           </Card>
