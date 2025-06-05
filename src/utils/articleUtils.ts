@@ -2,42 +2,41 @@
 import { Chapter, Media } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 
 export const fetchArticleContent = async (
   url: string, 
   retryCount = 0
-): Promise<{ content: string; media: Media[] } | { error: string }> => {
+): Promise<{ content: string; media: Media[]; title?: string } | { error: string }> => {
   try {
-    // In a real implementation, this would call a backend API to fetch and parse the article
-    // For now, we'll simulate the process with a timeout
+    console.log(`Attempting to fetch article content from: ${url}`);
     
-    // Simulate some failures to demonstrate retry logic
-    if (Math.random() > 0.8 && retryCount < MAX_RETRIES - 1) {
-      throw new Error('Simulated fetch failure');
+    // Call the fetch-article edge function
+    const { data, error } = await supabase.functions.invoke('fetch-article', {
+      body: { url }
+    });
+    
+    if (error) {
+      console.error('Error invoking fetch-article function:', error);
+      throw new Error(error.message || 'Failed to fetch article');
     }
     
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to extract article content');
+    }
     
-    // This is where we'd parse the article content and extract media
-    // For now, return dummy content
+    console.log(`Successfully fetched article: ${data.title}`);
+    
     return {
-      content: `<div class="article-content">
-        <p>This is simulated content for the article at ${url}.</p>
-        <p>In a real implementation, we would extract the actual content from the page using a backend service.</p>
-        <p>The backend would use libraries like BeautifulSoup or Playwright to extract the clean content.</p>
-      </div>`,
-      media: [
-        {
-          type: 'image',
-          url: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1741&q=80',
-          alt: 'Sample image from article'
-        }
-      ]
+      content: data.content || '',
+      media: data.media || [],
+      title: data.title
     };
     
   } catch (error) {
+    console.error(`Error fetching article (attempt ${retryCount + 1}):`, error);
+    
     // Implement retry logic
     if (retryCount < MAX_RETRIES) {
       console.log(`Retry ${retryCount + 1}/${MAX_RETRIES} for URL: ${url}`);
@@ -46,13 +45,15 @@ export const fetchArticleContent = async (
     }
     
     return {
-      error: `Failed to fetch article after ${MAX_RETRIES} attempts: ${(error as Error).message}`
+      error: `Failed to fetch article after ${MAX_RETRIES + 1} attempts: ${(error as Error).message}`
     };
   }
 };
 
 export const generateChapterSummary = async (title: string, content: string): Promise<string> => {
   try {
+    console.log('Generating summary for chapter:', title);
+    
     // Call the Gemini edge function to generate a summary
     const { data, error } = await supabase.functions.invoke('gemini', {
       body: {
@@ -67,6 +68,11 @@ export const generateChapterSummary = async (title: string, content: string): Pr
     if (error) {
       console.error('Error invoking Gemini function:', error);
       throw error;
+    }
+    
+    if (data?.error) {
+      console.error('Gemini API error:', data.error);
+      throw new Error(data.error);
     }
     
     return data?.summary || 'Failed to generate summary. You can edit this description manually.';

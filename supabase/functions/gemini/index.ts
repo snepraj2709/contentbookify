@@ -29,8 +29,17 @@ async function callGeminiAPI(
           ]
         }
       ],
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 1024,
+      },
       ...options
     };
+    
+    console.log("Calling Gemini API with URL:", url);
+    console.log("Payload:", JSON.stringify(payload, null, 2));
     
     const response = await fetch(url, {
       method: "POST",
@@ -78,29 +87,35 @@ serve(async (req) => {
         
         // Format the prompt for cover image generation
         const imagePrompt = `
-        I want you to generate a book cover image based on the following description:
+        Create a detailed description for a book cover design based on the following:
         
-        ${data.prompt}
+        Book Title: ${data.title || "Untitled Book"}
+        Author: ${data.author || "Anonymous"}
+        Description: ${data.prompt}
         
-        The book title is: ${data.title || "Untitled Book"}
-        The author is: ${data.author || "Anonymous"}
+        Provide a vivid, detailed description of what the book cover should look like, including:
+        - Visual style and color scheme
+        - Typography suggestions
+        - Layout and composition
+        - Any symbolic elements or imagery
+        - Overall mood and feeling
         
-        Generate a detailed, high-quality book cover design suitable for a professional publication.
+        Make it professional and appealing for the target audience.
         `;
         
-        console.log("Generating cover with prompt:", imagePrompt);
+        console.log("Generating cover with prompt for title:", data.title);
         
-        // Call Gemini for image generation
-        const imageResponse = await callGeminiAPI("gemini-pro", imagePrompt);
+        // Call Gemini for cover description using the correct model
+        const imageResponse = await callGeminiAPI("gemini-1.5-flash", imagePrompt);
         const imageData = await imageResponse.json();
         
-        // Extract the text response (a description of what the image would look like)
+        // Extract the text response
         const coverDescription = imageData.candidates?.[0]?.content?.parts?.[0]?.text || 
           "Sorry, I couldn't generate a cover image description.";
           
         result = { 
           description: coverDescription,
-          message: "In a real implementation, this would generate an actual image URL. For now, you'll need to use a placeholder image."
+          message: "Cover design description generated successfully. You can use this description with an image generation service."
         };
         break;
       
@@ -111,24 +126,29 @@ serve(async (req) => {
         
         // Format the prompt for chapter summary
         const summaryPrompt = `
-        Summarize the following article content into a concise chapter summary of about 100-200 words.
-        Make it engaging and highlight the key points.
+        Please create a compelling chapter summary for the following article content. 
+        The summary should be 100-150 words and capture the main points and key insights.
+        Make it engaging and informative for readers who want to understand what this chapter covers.
         
-        Content:
-        ${data.content}
+        Article Title: ${data.title || "Untitled Chapter"}
+        
+        Content to summarize:
+        ${data.content.substring(0, 3000)}${data.content.length > 3000 ? '...' : ''}
+        
+        Please provide only the summary text without any additional formatting or explanations.
         `;
         
         console.log("Generating summary for chapter:", data.title || "Untitled Chapter");
         
-        // Call Gemini for text summarization
-        const summaryResponse = await callGeminiAPI("gemini-pro", summaryPrompt);
+        // Call Gemini for text summarization using the correct model
+        const summaryResponse = await callGeminiAPI("gemini-1.5-flash", summaryPrompt);
         const summaryData = await summaryResponse.json();
         
         // Extract the summary text
         const summary = summaryData.candidates?.[0]?.content?.parts?.[0]?.text || 
-          "Failed to generate a summary.";
+          "Failed to generate a summary. Please edit this description manually.";
           
-        result = { summary };
+        result = { summary: summary.trim() };
         break;
         
       default:

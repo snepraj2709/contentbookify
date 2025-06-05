@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, ExternalLink, Loader2 } from 'lucide-react';
@@ -40,7 +39,8 @@ const ArticleInputStep: React.FC = () => {
               variant: "destructive"
             });
           } else {
-            const title = extractTitleFromUrl(chapter.url);
+            // Use the extracted title from the article or fall back to URL-based title
+            const title = result.title || extractTitleFromUrl(chapter.url);
             const summary = await generateChapterSummary(title, result.content);
             
             updateChapter(chapter.id, {
@@ -63,7 +63,7 @@ const ArticleInputStep: React.FC = () => {
     };
     
     processArticles();
-  }, [state.book.chapters, updateChapter, toast]);
+  }, [state.book.chapters, updateChapter, toast, isProcessing]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
