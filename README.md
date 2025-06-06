@@ -3,6 +3,11 @@
 **ContentBookify** is an AI-powered web app that transforms your favorite blog posts into a beautifully formatted PDF book. Built with ❤️ using Lovable, it allows users to organize blogs into chapters, customize book covers, and download their curated book in one click.
 
 ---
+## 💾 Live Demo
+
+👉 [ContentBookify](https://contentbookify.lovable.app/)
+
+---
 
 ## 🚀 Features
 
@@ -33,12 +38,6 @@
 | Backend      | Supabase (Auth + Edge Functions) |
 | AI Integration | Gemini API               |
 | Hosting      | Lovable (Frontend), Supabase (Backend) |
-
----
-
-## 💾 Live Demo
-
-👉 [Try ContentBookify - ](https://contentbookify.lovable.app/)
 
 ---
 
