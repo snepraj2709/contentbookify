@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, ExternalLink, Loader2 } from 'lucide-react';
@@ -40,7 +39,8 @@ const ArticleInputStep: React.FC = () => {
               variant: "destructive"
             });
           } else {
-            const title = extractTitleFromUrl(chapter.url);
+            // Use the extracted title from the article or fall back to URL-based title
+            const title = result.title || extractTitleFromUrl(chapter.url);
             const summary = await generateChapterSummary(title, result.content);
             
             updateChapter(chapter.id, {
@@ -63,7 +63,7 @@ const ArticleInputStep: React.FC = () => {
     };
     
     processArticles();
-  }, [state.book.chapters, updateChapter, toast]);
+  }, [state.book.chapters, updateChapter, toast, isProcessing]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +76,7 @@ const ArticleInputStep: React.FC = () => {
   const handleContinue = () => {
     if (state.book.chapters.length === 0) {
       toast({
-        title: "No articles added",
+        title: "No blogs added",
         description: "Please add at least one article to continue",
         variant: "destructive"
       });
@@ -86,8 +86,8 @@ const ArticleInputStep: React.FC = () => {
     // Check if any articles are still loading
     if (state.book.chapters.some(chapter => chapter.isLoading)) {
       toast({
-        title: "Articles still loading",
-        description: "Please wait until all articles have finished loading",
+        title: "Blogs still loading",
+        description: "Please wait until all blogs have finished loading",
         variant: "destructive"
       });
       return;
@@ -104,9 +104,9 @@ const ArticleInputStep: React.FC = () => {
       className="w-full"
     >
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold tracking-tight">Step 1: Add Your Articles</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Step 1: Add Blogs</h2>
         <p className="text-muted-foreground mt-2">
-          Enter the URLs of articles you want to include in your book
+          Enter the URLs of blogs you want to include in your book
         </p>
       </div>
       
@@ -136,7 +136,7 @@ const ArticleInputStep: React.FC = () => {
               className="text-center p-12"
             >
               <p className="text-muted-foreground">
-                No articles added yet. Enter article URLs above to begin creating your book.
+                No Blogs added yet. Enter blog URLs above to begin creating your book.
               </p>
             </motion.div>
           ) : (

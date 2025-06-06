@@ -74,38 +74,6 @@ const ChapterCustomizationStep: React.FC = () => {
       </div>
 
       <div className='max-w-3xl mx-auto mb-8'>
-        <div className='mb-6 space-y-4'>
-          <div>
-            <label
-              htmlFor='bookTitle'
-              className='block text-sm font-medium mb-1'
-            >
-              Book Title
-            </label>
-            <Input
-              id='bookTitle'
-              value={state.book.title}
-              onChange={(e) => setBookTitle(e.target.value)}
-              className='max-w-md'
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor='bookAuthor'
-              className='block text-sm font-medium mb-1'
-            >
-              Author Name
-            </label>
-            <Input
-              id='bookAuthor'
-              value={state.book.author}
-              onChange={(e) => setBookAuthor(e.target.value)}
-              className='max-w-md'
-            />
-          </div>
-        </div>
-
         <h3 className='text-lg font-medium mb-4'>Arrange and Edit Chapters</h3>
 
         <DragDropContext onDragEnd={handleDragEnd}>
@@ -207,6 +175,37 @@ const ChapterCustomizationStep: React.FC = () => {
             )}
           </Droppable>
         </DragDropContext>
+        <div className='my-6 space-y-4'>
+          <div>
+            <label
+              htmlFor='bookTitle'
+              className='block text-sm font-medium mb-1'
+            >
+              Book Title
+            </label>
+            <Input
+              id='bookTitle'
+              value={state.book.title}
+              onChange={(e) => setBookTitle(e.target.value)}
+              className='max-w-md'
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor='bookAuthor'
+              className='block text-sm font-medium mb-1'
+            >
+              Author Name
+            </label>
+            <Input
+              id='bookAuthor'
+              value={state.book.author}
+              onChange={(e) => setBookAuthor(e.target.value)}
+              className='max-w-md'
+            />
+          </div>
+        </div>
       </div>
 
       <div className='flex justify-between max-w-3xl mx-auto'>

@@ -18,12 +18,12 @@ const Index = () => {
           <div className="flex items-center justify-center mb-6">
             <BookOpen className="h-12 w-12 mr-4 text-primary" />
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-              PDF/EPUB Book Creator
+              Blog to Book
             </h1>
           </div>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Create beautiful books from your favorite articles with just a few clicks.
-            Download instantly as PDF or EPUB.
+            Create beautiful books from your favorite blogs with just a few clicks.
+            Download instantly as PDF.
           </p>
         </motion.div>
         
