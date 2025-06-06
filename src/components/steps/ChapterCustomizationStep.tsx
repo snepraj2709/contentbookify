@@ -147,7 +147,7 @@ const ChapterCustomizationStep: React.FC = () => {
             )}
           </Droppable>
         </DragDropContext>
-         <div className="mb-6 space-y-4">
+         <div className="my-6 space-y-4">
           <div>
             <label htmlFor="bookTitle" className="block text-sm font-medium mb-1">
               Book Title
