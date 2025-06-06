@@ -15,7 +15,7 @@ const Stepper: React.FC<StepperProps> = ({ className }) => {
   const { currentStep } = state;
   
   const steps: { id: StepType; label: string }[] = [
-    { id: 'articles', label: 'Add Articles' },
+    { id: 'articles', label: 'Add Blogs' },
     { id: 'chapters', label: 'Customize Chapters' },
     { id: 'cover', label: 'Design Cover' },
     { id: 'preview', label: 'Preview & Download' }

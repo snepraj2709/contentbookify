@@ -22,8 +22,8 @@ const Index = () => {
             </h1>
           </div>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Create beautiful books from your favorite articles with just a few clicks.
-            Download instantly as PDF or EPUB.
+            Create beautiful books from your favorite blogs with just a few clicks.
+            Download instantly as PDF.
           </p>
         </motion.div>
         
