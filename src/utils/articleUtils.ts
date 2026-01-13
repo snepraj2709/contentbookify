@@ -1,11 +1,10 @@
 /** @format */
 
-import { Chapter, Media } from '@/types/book.interface';
-import { supabase } from '@/integrations/supabase/client';
+import { Media } from '@/types/book.interface';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
-const PYTHON_BACKEND_URL = 'http://localhost:8000';
+const PYTHON_BACKEND_URL = import.meta.env.VITE_BACKEND_BASE_URL || 'http://localhost:8000';
 
 export const fetchArticleContent = async (
   url: string,

@@ -29,15 +29,18 @@ app.add_middleware(
 def home():
     return {"message": "Book Cover Generator Backend is running!"}
 
+class CoverRequest(BaseModel):
+    prompt: str
+
 @app.post("/generate-cover/")
-async def create_book_cover(prompt: str):
+async def create_book_cover(request: CoverRequest):
     """API endpoint to generate book cover from prompt."""
     try:
         # Generate book cover
-        cover_url = generate_book_cover(prompt)
+        cover_url = generate_book_cover(request.prompt)
 
         # Save cover to Supabase
-        response = save_book_cover(prompt, cover_url)
+        response = save_book_cover(request.prompt, cover_url)
 
         return {
             "message": "Book cover generated successfully",

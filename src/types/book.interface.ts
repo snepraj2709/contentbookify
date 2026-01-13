@@ -30,7 +30,7 @@ export interface CoverOptions {
   subtitleColor: string;
   authorColor: string;
   fontFamily: 'serif' | 'sans' | 'display';
-  layout: 'center' | 'left' | 'minimal';
+  layout: 'center' | 'left' | 'right' | 'minimal';
 }
 
 export interface Book {

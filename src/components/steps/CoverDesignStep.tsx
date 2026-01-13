@@ -75,30 +75,29 @@ const CoverDesignStep: React.FC = () => {
         setIsGenerating(true);
 
         try {
-            // Call the Gemini edge function to generate a cover
-            const { data, error } = await supabase.functions.invoke('gemini', {
-                body: {
-                    action: 'generateCoverImage',
-                    data: {
-                        prompt: promptText,
-                        title: state.book.title,
-                        author: state.book.author,
-                    },
+            // Call the Python backend to generate a cover
+            const backendUrl = import.meta.env.VITE_BACKEND_BASE_URL || 'http://localhost:8000';
+            const response = await fetch(`${backendUrl.replace(/\/$/, '')}/generate-cover/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({
+                    prompt: promptText
+                }),
             });
 
-            if (error) {
-                console.error('Error invoking Gemini function:', error);
-                throw error;
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to generate cover');
             }
 
-            // In a real implementation, we would use the generated image URL
-            // For now, we'll use a random placeholder since we're not actually generating images
-            const randomImageID = Math.floor(Math.random() * 1000);
+            const data = await response.json();
+            
             const newCover: BookCover = {
                 id: uuidv4(),
                 type: 'generated',
-                url: `https://picsum.photos/seed/${randomImageID}/800/1200`,
+                url: data.cover_url,
                 name: `Generated from: ${promptText.substring(0, 20)}...`,
             };
 
