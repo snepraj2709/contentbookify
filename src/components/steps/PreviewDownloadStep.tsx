@@ -237,10 +237,10 @@ const PreviewDownloadStep: React.FC = () => {
                                         }}
                                         className='w-full justify-start gap-2'
                                     >
-                                        <ToggleGroupItem value='PDF' className='flex-1 border data-[state=on]:border-primary data-[state=on]:bg-primary/5'>
+                                        <ToggleGroupItem value='PDF' className='flex-1 border data-[state=on]:border-primary data-[state=on]:bg-primary/5 data-[state=on]:text-foreground'>
                                             <FileText className='h-4 w-4 mr-2' /> PDF
                                         </ToggleGroupItem>
-                                        <ToggleGroupItem value='EPUB' className='flex-1 border data-[state=on]:border-primary data-[state=on]:bg-primary/5'>
+                                        <ToggleGroupItem value='EPUB' className='flex-1 border data-[state=on]:border-primary data-[state=on]:bg-primary/5 data-[state=on]:text-foreground'>
                                             <Book className='h-4 w-4 mr-2' /> EPUB
                                         </ToggleGroupItem>
                                     </ToggleGroup>
