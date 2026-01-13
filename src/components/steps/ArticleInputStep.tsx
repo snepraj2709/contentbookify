@@ -232,8 +232,12 @@ const ArticleInputStep: React.FC = () => {
                     <div className="flex flex-col sm:flex-row">
                         {/* Thumbnail / Number */}
                         <div className="w-full sm:w-48 h-32 sm:h-auto bg-muted shrink-0 flex items-center justify-center relative overflow-hidden">
-                           {chapter.media ? (
-                               <img src={chapter.media} alt={chapter.title} className="w-full h-full object-cover" />
+                           {chapter.media?.find((m) => m.type === 'image')?.url ? (
+                               <img
+                                   src={chapter.media.find((m) => m.type === 'image')?.url}
+                                   alt={chapter.title}
+                                   className="w-full h-full object-cover"
+                               />
                            ) : (
                                <div className="text-6xl font-serif font-bold text-muted-foreground/20">
                                    {index + 1}

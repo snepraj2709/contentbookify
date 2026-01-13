@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
+const PYTHON_BACKEND_URL = 'http://localhost:8000';
 
 export const fetchArticleContent = async (
   url: string,
@@ -15,15 +16,21 @@ export const fetchArticleContent = async (
   try {
     console.log(`Attempting to fetch article content from: ${url}`);
 
-    // Call the fetch-article edge function
-    const { data, error } = await supabase.functions.invoke('fetch-article', {
-      body: { url },
+    // Call the Python backend
+    const response = await fetch(`${PYTHON_BACKEND_URL}/fetch-article/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url }),
     });
 
-    if (error) {
-      console.error('Error invoking fetch-article function:', error);
-      throw new Error(error.message || 'Failed to fetch article');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to fetch article');
     }
+
+    const data = await response.json();
 
     if (!data.success) {
       throw new Error(data.error || 'Failed to extract article content');
@@ -63,26 +70,21 @@ export const generateChapterSummary = async (
   try {
     console.log('Generating summary for chapter:', title);
 
-    // Call the Gemini edge function to generate a summary
-    const { data, error } = await supabase.functions.invoke('gemini', {
-      body: {
-        action: 'generateChapterSummary',
-        data: {
-          title,
-          content,
-        },
+    // Call the Python backend
+    const response = await fetch(`${PYTHON_BACKEND_URL}/generate-summary/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ title, content }),
     });
 
-    if (error) {
-      console.error('Error invoking Gemini function:', error);
-      throw error;
+    if (!response.ok) {
+       console.error('Error invoking Gemini function via Python backend');
+       throw new Error('Failed to generate summary');
     }
-
-    if (data?.error) {
-      console.error('Gemini API error:', data.error);
-      throw new Error(data.error);
-    }
+    
+    const data = await response.json();
 
     return (
       data?.summary ||

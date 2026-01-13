@@ -4,6 +4,15 @@ from services import generate_book_cover
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
+from services import fetch_article_content, generate_chapter_summary
+from pydantic import BaseModel
+
+class ArticleRequest(BaseModel):
+    url: str
+
+class SummaryRequest(BaseModel):
+    title: str
+    content: str
 
 app = FastAPI()
 
@@ -37,3 +46,22 @@ async def create_book_cover(prompt: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/fetch-article/")
+async def api_fetch_article(request: ArticleRequest):
+    result = fetch_article_content(request.url)
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error"))
+    return result
+
+@app.post("/generate-summary/")
+async def api_generate_summary(request: SummaryRequest):
+    summary = generate_chapter_summary(request.title, request.content)
+    if summary == "Summary generation failed." or summary == "Failed to generate summary.":
+        return {"summary": summary}
+    return {"summary": summary}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
