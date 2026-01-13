@@ -27,16 +27,24 @@ const PreviewDownloadStep: React.FC = () => {
         try {
             console.log('Starting book generation...', state.book);
 
-            // Call the Supabase edge function to generate the book
-            const { data, error } = await supabase.functions.invoke('generate-book', {
-                body: {
-                    book: state.book,
+            // Call the Python backend to generate the book
+            const backendUrl = import.meta.env.VITE_BACKEND_BASE_URL || 'http://localhost:8000';
+            const response = await fetch(`${backendUrl.replace(/\/$/, '')}/generate-book/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({
+                    book: state.book,
+                }),
             });
 
-            if (error) {
-                throw new Error(error.message);
+            if (!response.ok) {
+                 const errorData = await response.json();
+                 throw new Error(errorData.detail || 'Failed to generate book');
             }
+
+            const data = await response.json();
 
             if (!data.success) {
                 throw new Error('Failed to generate book');

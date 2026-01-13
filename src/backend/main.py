@@ -65,6 +65,49 @@ async def api_generate_summary(request: SummaryRequest):
         return {"summary": summary}
     return {"summary": summary}
 
+class Media(BaseModel):
+    type: str
+    url: str | None = None
+    content: str | None = None
+    alt: str | None = None
+
+class Chapter(BaseModel):
+    id: str
+    title: str
+    description: str
+    url: str
+    content: str | None = None
+    media: list[Media] | None = None
+
+class Book(BaseModel):
+    title: str
+    subtitle: str | None = None
+    author: str
+    chapters: list[Chapter]
+    format: str
+
+class GenerateBookRequest(BaseModel):
+    book: Book
+
+from services import generate_book_pdf
+
+@app.post("/generate-book/")
+async def api_generate_book(request: GenerateBookRequest):
+    """API endpoint to generate book PDF."""
+    try:
+        if request.book.format != 'PDF':
+             raise HTTPException(status_code=400, detail="Only PDF format is supported currently via this endpoint.")
+             
+        book_data = request.book.model_dump()
+        result = generate_book_pdf(book_data)
+        
+        if not result.get("success"):
+             raise HTTPException(status_code=500, detail=result.get("error"))
+             
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)

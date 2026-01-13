@@ -14,6 +14,7 @@ dist-ssr
 *.env
 __pycache__
 venv
+migrations
 
 
 # Editor directories and files
