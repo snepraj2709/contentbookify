@@ -8,10 +8,11 @@ import {
   BookCover,
   SessionState,
   StepType,
+  CoverOptions,
 } from '@/types/book.interface';
 import { useToast } from '@/components/ui/use-toast';
 
-// Default covers as templates
+// Default covers as templates (keep existing)
 const DEFAULT_COVERS: BookCover[] = [
   {
     id: 'template-1',
@@ -43,10 +44,18 @@ const DEFAULT_COVERS: BookCover[] = [
 const initialState: SessionState = {
   book: {
     title: 'My Book',
+    subtitle: '',
     author: 'Your Name',
     chapters: [],
     coverImage: null,
     format: 'PDF',
+    coverOptions: {
+      titleColor: '#ffffff',
+      subtitleColor: '#e2e8f0',
+      authorColor: '#ffffff',
+      fontFamily: 'serif',
+      layout: 'center'
+    }
   },
   coversGenerated: 0,
   cachedCovers: [...DEFAULT_COVERS],
@@ -63,9 +72,11 @@ type Action =
     }
   | { type: 'REORDER_CHAPTERS'; payload: { chapters: Chapter[] } }
   | { type: 'SET_BOOK_TITLE'; payload: { title: string } }
+  | { type: 'SET_BOOK_SUBTITLE'; payload: { subtitle: string } }
   | { type: 'SET_BOOK_AUTHOR'; payload: { author: string } }
   | { type: 'SET_BOOK_FORMAT'; payload: { format: 'PDF' | 'EPUB' } }
   | { type: 'SET_BOOK_COVER'; payload: { cover: BookCover } }
+  | { type: 'SET_COVER_OPTIONS'; payload: { options: Partial<CoverOptions> } }
   | { type: 'ADD_GENERATED_COVER'; payload: { cover: BookCover } }
   | { type: 'SET_CURRENT_STEP'; payload: { step: StepType } };
 
@@ -132,6 +143,15 @@ const bookReducer = (state: SessionState, action: Action): SessionState => {
         },
       };
 
+    case 'SET_BOOK_SUBTITLE':
+      return {
+        ...state,
+        book: {
+          ...state.book,
+          subtitle: action.payload.subtitle,
+        },
+      };
+
     case 'SET_BOOK_AUTHOR':
       return {
         ...state,
@@ -157,6 +177,18 @@ const bookReducer = (state: SessionState, action: Action): SessionState => {
           ...state.book,
           coverImage: action.payload.cover,
         },
+      };
+
+    case 'SET_COVER_OPTIONS':
+      return {
+        ...state,
+        book: {
+          ...state.book,
+          coverOptions: {
+            ...state.book.coverOptions!,
+            ...action.payload.options
+          }
+        }
       };
 
     case 'ADD_GENERATED_COVER':
@@ -191,9 +223,11 @@ interface BookContextType {
   updateChapter: (id: string, updates: Partial<Chapter>) => void;
   reorderChapters: (chapters: Chapter[]) => void;
   setBookTitle: (title: string) => void;
+  setBookSubtitle: (subtitle: string) => void;
   setBookAuthor: (author: string) => void;
   setBookFormat: (format: 'PDF' | 'EPUB') => void;
   setBookCover: (cover: BookCover) => void;
+  updateCoverOptions: (options: Partial<CoverOptions>) => void;
   addGeneratedCover: (cover: BookCover) => void;
   setCurrentStep: (step: StepType) => void;
   canGenerateMoreCovers: boolean;
@@ -238,6 +272,10 @@ export const BookProvider: React.FC<{ children: ReactNode }> = ({
     dispatch({ type: 'SET_BOOK_TITLE', payload: { title } });
   };
 
+  const setBookSubtitle = (subtitle: string) => {
+    dispatch({ type: 'SET_BOOK_SUBTITLE', payload: { subtitle } });
+  };
+
   const setBookAuthor = (author: string) => {
     dispatch({ type: 'SET_BOOK_AUTHOR', payload: { author } });
   };
@@ -248,6 +286,10 @@ export const BookProvider: React.FC<{ children: ReactNode }> = ({
 
   const setBookCover = (cover: BookCover) => {
     dispatch({ type: 'SET_BOOK_COVER', payload: { cover } });
+  };
+
+  const updateCoverOptions = (options: Partial<CoverOptions>) => {
+    dispatch({ type: 'SET_COVER_OPTIONS', payload: { options } });
   };
 
   const addGeneratedCover = (cover: BookCover) => {
@@ -277,9 +319,11 @@ export const BookProvider: React.FC<{ children: ReactNode }> = ({
     updateChapter,
     reorderChapters,
     setBookTitle,
+    setBookSubtitle,
     setBookAuthor,
     setBookFormat,
     setBookCover,
+    updateCoverOptions,
     addGeneratedCover,
     setCurrentStep,
     canGenerateMoreCovers,

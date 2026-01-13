@@ -20,8 +20,9 @@ export default {
 		},
 		extend: {
 			fontFamily: {
-				sans: ['SF Pro Display', 'system-ui', 'sans-serif'],
-				serif: ['New York', 'Georgia', 'serif'],
+				sans: ['Inter', 'SF Pro Display', 'system-ui', 'sans-serif'],
+				serif: ['Playfair Display', 'Georgia', 'serif'],
+        accent: ['Libre Baskerville', 'serif'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',

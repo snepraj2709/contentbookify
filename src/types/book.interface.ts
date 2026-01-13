@@ -25,11 +25,21 @@ export interface BookCover {
   name?: string;
 }
 
+export interface CoverOptions {
+  titleColor: string;
+  subtitleColor: string;
+  authorColor: string;
+  fontFamily: 'serif' | 'sans' | 'display';
+  layout: 'center' | 'left' | 'minimal';
+}
+
 export interface Book {
   title: string;
+  subtitle?: string;
   author: string;
   chapters: Chapter[];
   coverImage: BookCover | null;
+  coverOptions?: CoverOptions;
   format: 'PDF' | 'EPUB';
 }
 

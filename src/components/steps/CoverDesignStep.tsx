@@ -1,4 +1,3 @@
-/** @format */
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,323 +5,482 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, ArrowRight, Upload, Wand2, Loader2 } from 'lucide-react';
+import {
+    ArrowLeft,
+    ArrowRight,
+    Upload,
+    Wand2,
+    Loader2,
+    LayoutTemplate,
+    Palette,
+    Type,
+    Image as ImageIcon
+} from 'lucide-react';
 import { useBook } from '@/context/BookContext';
 import { BookCover } from '@/types/book.interface';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const CoverDesignStep: React.FC = () => {
-  const {
-    state,
-    setBookCover,
-    addGeneratedCover,
-    setCurrentStep,
-    canGenerateMoreCovers,
-  } = useBook();
-  const [promptText, setPromptText] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const { toast } = useToast();
+    const {
+        state,
+        setBookCover,
+        addGeneratedCover,
+        setCurrentStep,
+        canGenerateMoreCovers,
+        setBookTitle,
+        setBookSubtitle,
+        setBookAuthor,
+        updateCoverOptions
+    } = useBook();
 
-  const handleGenerateCover = async () => {
-    if (!promptText.trim()) {
-      toast({
-        title: 'Empty prompt',
-        description: 'Please enter a description for your cover',
-        variant: 'destructive',
-      });
-      return;
-    }
+    const [promptText, setPromptText] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const { toast } = useToast();
 
-    setIsGenerating(true);
+    // Helper to get text alignment class
+    const getTextAlign = (align: string | undefined) => {
+        switch (align) {
+            case 'left': return 'text-left items-start';
+            case 'right': return 'text-right items-end';
+            default: return 'text-center items-center';
+        }
+    };
 
-    try {
-      // Call the Gemini edge function to generate a cover
-      const { data, error } = await supabase.functions.invoke('gemini', {
-        body: {
-          action: 'generateCoverImage',
-          data: {
-            prompt: promptText,
-            title: state.book.title,
-            author: state.book.author,
-          },
-        },
-      });
+    // Helper to get font family class
+    const getFontFamily = (font: string | undefined) => {
+        switch (font) {
+            case 'sans': return 'font-sans';
+            case 'display': return 'font-sans tracking-tight'; // Using sans as proxy for display if not custom
+            default: return 'font-serif';
+        }
+    };
 
-      if (error) {
-        console.error('Error invoking Gemini function:', error);
-        throw error;
-      }
+    const handleGenerateCover = async () => {
+        if (!promptText.trim()) {
+            toast({
+                title: 'Empty prompt',
+                description: 'Please enter a description for your cover',
+                variant: 'destructive',
+            });
+            return;
+        }
 
-      // In a real implementation, we would use the generated image URL
-      // For now, we'll use a random placeholder since we're not actually generating images
-      const randomImageID = Math.floor(Math.random() * 1000);
-      const newCover: BookCover = {
-        id: uuidv4(),
-        type: 'generated',
-        url: `https://picsum.photos/seed/${randomImageID}/800/1200`,
-        name: `Generated from: ${promptText.substring(0, 20)}...`,
-      };
+        setIsGenerating(true);
 
-      addGeneratedCover(newCover);
-      setBookCover(newCover);
-      setPromptText('');
+        try {
+            // Call the Gemini edge function to generate a cover
+            const { data, error } = await supabase.functions.invoke('gemini', {
+                body: {
+                    action: 'generateCoverImage',
+                    data: {
+                        prompt: promptText,
+                        title: state.book.title,
+                        author: state.book.author,
+                    },
+                },
+            });
 
-      toast({
-        title: 'Cover generated',
-        description: `${3 - (state.coversGenerated + 1)} generations remaining`,
-      });
-    } catch (error) {
-      console.error('Cover generation error:', error);
-      toast({
-        title: 'Generation failed',
-        description: 'Failed to generate cover image',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+            if (error) {
+                console.error('Error invoking Gemini function:', error);
+                throw error;
+            }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Create URL for the uploaded file
-      const fileUrl = URL.createObjectURL(file);
-      const newCover: BookCover = {
-        id: uuidv4(),
-        type: 'upload',
-        url: fileUrl,
-        name: file.name,
-      };
+            // In a real implementation, we would use the generated image URL
+            // For now, we'll use a random placeholder since we're not actually generating images
+            const randomImageID = Math.floor(Math.random() * 1000);
+            const newCover: BookCover = {
+                id: uuidv4(),
+                type: 'generated',
+                url: `https://picsum.photos/seed/${randomImageID}/800/1200`,
+                name: `Generated from: ${promptText.substring(0, 20)}...`,
+            };
 
-      setBookCover(newCover);
+            addGeneratedCover(newCover);
+            setBookCover(newCover);
+            setPromptText('');
 
-      toast({
-        title: 'Cover uploaded',
-        description: 'Your custom cover has been set',
-      });
-    }
-  };
+            toast({
+                title: 'Cover generated',
+                description: `${3 - (state.coversGenerated + 1)} generations remaining`,
+            });
+        } catch (error) {
+            console.error('Cover generation error:', error);
+            toast({
+                title: 'Generation failed',
+                description: 'Failed to generate cover image',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
-  const handleSelectTemplate = (cover: BookCover) => {
-    setBookCover(cover);
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const fileUrl = URL.createObjectURL(file);
+            const newCover: BookCover = {
+                id: uuidv4(),
+                type: 'upload',
+                url: fileUrl,
+                name: file.name,
+            };
 
-    toast({
-      title: 'Template selected',
-      description: `Selected template: ${cover.name}`,
-    });
-  };
+            setBookCover(newCover);
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className='w-full'
-    >
-      <div className='text-center mb-8'>
-        <h2 className='text-3xl font-bold tracking-tight'>
-          Step 3: Design Your Book Cover
-        </h2>
-        <p className='text-muted-foreground mt-2'>
-          Choose a template, upload your own, or generate a cover with AI
-        </p>
-      </div>
+            toast({
+                title: 'Cover uploaded',
+                description: 'Your custom cover has been set',
+            });
+        }
+    };
 
-      <div className='grid md:grid-cols-[1fr_1.5fr] gap-8 max-w-6xl mx-auto mb-8'>
-        <div>
-          <h3 className='text-lg font-medium mb-4'>Cover Options</h3>
-
-          <div className='space-y-6'>
-            {/* Upload */}
-            <Card>
-              <CardContent className='p-4'>
-                <h4 className='font-medium mb-2'>Upload Your Own Cover</h4>
-                <p className='text-sm text-muted-foreground mb-3'>
-                  Upload a custom image for your book cover
-                </p>
-                <div className='flex items-center gap-2'>
-                  <Input
-                    type='file'
-                    accept='image/*'
-                    id='cover-upload'
-                    className='hidden'
-                    onChange={handleFileUpload}
-                  />
-                  <label htmlFor='cover-upload'>
-                    <Button
-                      variant='outline'
-                      className='cursor-pointer'
-                      asChild
-                    >
-                      <span>
-                        <Upload className='h-4 w-4 mr-2' />
-                        Upload Image
-                      </span>
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className='w-full max-w-7xl mx-auto h-[85vh] flex flex-col'
+        >
+            <div className='flex items-center justify-between mb-6 shrink-0'>
+                <div>
+                    <h2 className='text-3xl font-bold tracking-tight'>Design Cover</h2>
+                    <p className='text-muted-foreground'>Create a stunning cover for your book</p>
+                </div>
+                <div className='flex gap-3'>
+                    <Button variant='outline' onClick={() => setCurrentStep('chapters')}>
+                        <ArrowLeft className='h-4 w-4 mr-2' /> Back
                     </Button>
-                  </label>
+                    <Button onClick={() => setCurrentStep('preview')} disabled={!state.book.coverImage}>
+                        Preview & Download <ArrowRight className='h-4 w-4 ml-2' />
+                    </Button>
                 </div>
-              </CardContent>
-            </Card>
+            </div>
 
-            {/* Generate */}
-            <Card>
-              <CardContent className='p-4'>
-                <h4 className='font-medium mb-2'>Generate with AI</h4>
-                <p className='text-sm text-muted-foreground mb-3'>
-                  Describe your ideal cover and let AI generate it
-                  {canGenerateMoreCovers
-                    ? ` (${3 - state.coversGenerated} generations remaining)`
-                    : ' (No generations remaining)'}
-                </p>
-                <div className='space-y-3'>
-                  <Textarea
-                    placeholder='Describe your ideal book cover...'
-                    value={promptText}
-                    onChange={(e) => setPromptText(e.target.value)}
-                    disabled={!canGenerateMoreCovers || isGenerating}
-                    rows={3}
-                  />
-                  <Button
-                    onClick={handleGenerateCover}
-                    disabled={
-                      !canGenerateMoreCovers ||
-                      isGenerating ||
-                      !promptText.trim()
-                    }
-                    className='w-full'
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                        Generating...
-                      </>
+            <div className='flex-1 grid grid-cols-1 md:grid-cols-12 gap-6 min-h-0'>
+                {/* LEFT PANEL: RESOURCES */}
+                <Card className='md:col-span-3 flex flex-col overflow-hidden'>
+                    <Tabs defaultValue="templates" className="flex-1 flex flex-col">
+                        <div className="p-4 border-b">
+                            <TabsList className="w-full grid grid-cols-3">
+                                <TabsTrigger value="templates" title="Templates"><LayoutTemplate className="h-4 w-4" /></TabsTrigger>
+                                <TabsTrigger value="ai" title="AI Gen"><Wand2 className="h-4 w-4" /></TabsTrigger>
+                                <TabsTrigger value="upload" title="Upload"><Upload className="h-4 w-4" /></TabsTrigger>
+                            </TabsList>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-4">
+                            <TabsContent value="templates" className="mt-0 space-y-4">
+                                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">Library</h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {state.cachedCovers.filter(c => c.type !== 'generated' && c.type !== 'upload').map((cover) => (
+                                        <div
+                                            key={cover.id}
+                                            className={cn(
+                                                "aspect-[2/3] rounded-md overflow-hidden cursor-pointer border-2 transition-all hover:scale-105",
+                                                state.book.coverImage?.id === cover.id ? "border-primary ring-2 ring-primary/20" : "border-transparent"
+                                            )}
+                                            onClick={() => setBookCover(cover)}
+                                        >
+                                            <img src={cover.url} alt={cover.name} className="w-full h-full object-cover" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="ai" className="mt-0 space-y-4">
+                                <div className="space-y-4">
+                                    <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                                        <Label>AI Prompt</Label>
+                                        <Textarea 
+                                            placeholder="Describe a mystical forest landscape..." 
+                                            value={promptText}
+                                            onChange={(e) => setPromptText(e.target.value)}
+                                            rows={3}
+                                            className="resize-none bg-background"
+                                        />
+                                        <Button 
+                                            onClick={handleGenerateCover} 
+                                            disabled={isGenerating || !canGenerateMoreCovers}
+                                            className="w-full"
+                                        >
+                                            {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
+                                            Generate
+                                        </Button>
+                                        <p className="text-xs text-center text-muted-foreground">
+                                            {state.coversGenerated}/3 free generations used
+                                        </p>
+                                    </div>
+                                    
+                                    {state.cachedCovers.some(c => c.type === 'generated') && (
+                                        <>
+                                            <div className="h-px bg-border my-4" />
+                                            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">Generated</h3>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                 {state.cachedCovers.filter(c => c.type === 'generated').map((cover) => (
+                                                    <div
+                                                        key={cover.id}
+                                                        className={cn(
+                                                            "aspect-[2/3] rounded-md overflow-hidden cursor-pointer border-2 transition-all hover:scale-105",
+                                                            state.book.coverImage?.id === cover.id ? "border-primary ring-2 ring-primary/20" : "border-transparent"
+                                                        )}
+                                                        onClick={() => setBookCover(cover)}
+                                                    >
+                                                        <img src={cover.url} alt="Generated cover" className="w-full h-full object-cover" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="upload" className="mt-0">
+                                <div className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-8 text-center hover:bg-muted/50 transition-colors">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        id="cover-upload-panel"
+                                        className="hidden"
+                                        onChange={handleFileUpload}
+                                    />
+                                    <label htmlFor="cover-upload-panel" className="cursor-pointer flex flex-col items-center gap-3">
+                                        <div className="p-3 bg-primary/10 rounded-full text-primary">
+                                            <Upload className="h-6 w-6" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="font-medium">Click to upload</p>
+                                            <p className="text-xs text-muted-foreground">JPG, PNG up to 10MB</p>
+                                        </div>
+                                    </label>
+                                </div>
+                            </TabsContent>
+                        </div>
+                    </Tabs>
+                </Card>
+
+                {/* CENTER PANEL: PREVIEW */}
+                <div className='md:col-span-6 flex items-center justify-center bg-muted/30 rounded-xl relative overflow-hidden p-8'>
+                    <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-30 pointer-events-none" />
+                    
+                    {state.book.coverImage ? (
+                         <motion.div 
+                            layoutId="book-cover-preview"
+                            className="relative w-full max-w-[400px] aspect-[2/3] rounded-r-2xl rounded-l-sm shadow-2xl overflow-hidden group perspective-1000"
+                            style={{ boxShadow: '20px 20px 60px -10px rgba(0,0,0,0.4), inset 2px 0 5px rgba(255,255,255,0.7)' }}
+                         >
+                            {/* Spine Effect */}
+                            <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-r from-white/40 to-black/20 z-20 pointer-events-none" />
+                            <div className="absolute left-2 top-0 bottom-0 w-px bg-black/10 z-20 pointer-events-none" />
+                            
+                            {/* Image Background */}
+                            <img 
+                                src={state.book.coverImage.url} 
+                                alt="Cover" 
+                                className="absolute inset-0 w-full h-full object-cover z-0" 
+                            />
+                            
+                            {/* Overlay for tinting if needed (future feature) */}
+                            <div className="absolute inset-0 z-0 bg-black/20" />
+
+                            {/* Text Layer */}
+                            <div className={cn(
+                                "absolute inset-0 z-10 p-8 flex flex-col justify-end transition-all duration-300",
+                                getTextAlign(state.book.coverOptions?.layout)
+                            )}>
+                                <div className={cn(
+                                    "w-full space-y-2",
+                                    state.book.coverOptions?.layout === 'center' ? 'text-center' : 
+                                    state.book.coverOptions?.layout === 'right' ? 'text-right' : 'text-left'
+                                )}>
+                                    <h1 
+                                        className={cn("text-4xl font-bold leading-tight drop-shadow-lg", getFontFamily(state.book.coverOptions?.fontFamily))}
+                                        style={{ color: state.book.coverOptions?.titleColor }}
+                                    >
+                                        {state.book.title}
+                                    </h1>
+                                    {state.book.subtitle && (
+                                        <p 
+                                            className="text-lg font-medium drop-shadow-md opacity-90"
+                                            style={{ color: state.book.coverOptions?.subtitleColor }}
+                                        >
+                                            {state.book.subtitle}
+                                        </p>
+                                    )}
+                                    <div className="pt-8 pb-4">
+                                        <p 
+                                            className="text-sm tracking-widest uppercase font-semibold drop-shadow-md"
+                                            style={{ color: state.book.coverOptions?.authorColor }}
+                                        >
+                                            {state.book.author}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                         </motion.div>
                     ) : (
-                      <>
-                        <Wand2 className='h-4 w-4 mr-2' />
-                        Generate Cover
-                      </>
+                        <div className="text-center p-12 border-2 border-dashed rounded-xl bg-background/50 backdrop-blur-sm">
+                            <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <h3 className="text-lg font-medium">No cover selected</h3>
+                            <p className="text-muted-foreground">Choose a template from the left to get started</p>
+                        </div>
                     )}
-                  </Button>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Templates */}
-            <Card>
-              <CardContent className='p-4'>
-                <h4 className='font-medium mb-2'>Choose a Template</h4>
-                <p className='text-sm text-muted-foreground mb-3'>
-                  Select from our pre-designed cover templates
-                </p>
-                <div className='grid grid-cols-2 gap-3'>
-                  {state.cachedCovers.map((cover) => (
-                    <div
-                      key={cover.id}
-                      className={`
-                        relative aspect-[2/3] rounded-md overflow-hidden cursor-pointer
-                        transition-all duration-200
-                        ${
-                          state.book.coverImage?.id === cover.id
-                            ? 'ring-4 ring-primary/50 ring-offset-2'
-                            : 'hover:scale-[1.02]'
-                        }
-                      `}
-                      onClick={() => handleSelectTemplate(cover)}
-                    >
-                      <img
-                        src={cover.url}
-                        alt={cover.name || 'Book cover template'}
-                        className='w-full h-full object-cover'
-                      />
+                {/* RIGHT PANEL: CUSTOMIZATION */}
+                <Card className='md:col-span-3 flex flex-col overflow-hidden'>
+                    <div className="p-4 border-b bg-muted/10">
+                        <h3 className="font-semibold flex items-center gap-2"><Palette className="h-4 w-4" /> Customization</h3>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                        {/* Text Content */}
+                        <div className="space-y-3">
+                            <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold">Content</Label>
+                            <div className="space-y-3">
+                                <div className="space-y-1">
+                                    <Label htmlFor="title-input" className="text-xs">Title</Label>
+                                    <Input 
+                                        id="title-input" 
+                                        value={state.book.title} 
+                                        onChange={(e) => setBookTitle(e.target.value)} 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="subtitle-input" className="text-xs">Subtitle</Label>
+                                    <Input 
+                                        id="subtitle-input" 
+                                        value={state.book.subtitle || ''} 
+                                        onChange={(e) => setBookSubtitle(e.target.value)} 
+                                        placeholder="Optional subtitle"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="author-input" className="text-xs">Author</Label>
+                                    <Input 
+                                        id="author-input" 
+                                        value={state.book.author} 
+                                        onChange={(e) => setBookAuthor(e.target.value)} 
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
-        <div>
-          <h3 className='text-lg font-medium mb-4'>Cover Preview</h3>
-          <AnimatePresence mode='wait'>
-            {state.book.coverImage ? (
-              <motion.div
-                key={state.book.coverImage.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.3 }}
-                className='max-w-xs mx-auto'
-              >
-                <div className='relative aspect-[2/3] rounded-lg overflow-hidden shadow-2xl'>
-                  <img
-                    src={state.book.coverImage.url}
-                    alt='Book cover preview'
-                    className='w-full h-full object-cover'
-                  />
+                        <div className="h-px bg-border" />
 
-                  <div className='absolute inset-0 bg-gradient-to-b from-black/10 to-black/60 flex flex-col justify-end p-6'>
-                    <h2 className='text-white text-2xl font-bold mb-1'>
-                      {state.book.title}
-                    </h2>
-                    <p className='text-white/90 text-sm'>
-                      By {state.book.author}
-                    </p>
-                  </div>
-                </div>
+                        {/* Typography */}
+                        <div className="space-y-3">
+                            <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold">Typography</Label>
+                            
+                             <RadioGroup 
+                                value={state.book.coverOptions?.fontFamily} 
+                                onValueChange={(val) => updateCoverOptions({ fontFamily: val as any })}
+                                className="grid grid-cols-3 gap-2"
+                             >
+                                <div>
+                                    <RadioGroupItem value="serif" id="font-serif" className="peer sr-only" />
+                                    <Label
+                                        htmlFor="font-serif"
+                                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                                    >
+                                        <span className="font-serif text-xl">Aa</span>
+                                        <span className="text-[10px]">Serif</span>
+                                    </Label>
+                                </div>
+                                <div>
+                                    <RadioGroupItem value="sans" id="font-sans" className="peer sr-only" />
+                                    <Label
+                                        htmlFor="font-sans"
+                                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                                    >
+                                        <span className="font-sans text-xl">Aa</span>
+                                        <span className="text-[10px]">Sans</span>
+                                    </Label>
+                                </div>
+                                <div>
+                                    <RadioGroupItem value="display" id="font-display" className="peer sr-only" />
+                                    <Label
+                                        htmlFor="font-display"
+                                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                                    >
+                                        <span className="font-sans tracking-tighter font-black text-xl">Aa</span>
+                                        <span className="text-[10px]">Bold</span>
+                                    </Label>
+                                </div>
+                            </RadioGroup>
 
-                {state.book.coverImage.name && (
-                  <p className='text-center text-sm text-muted-foreground mt-3'>
-                    {state.book.coverImage.type === 'template'
-                      ? 'Template: '
-                      : state.book.coverImage.type === 'upload'
-                      ? 'Uploaded: '
-                      : state.book.coverImage.type === 'generated'
-                      ? 'Generated: '
-                      : ''}
-                    {state.book.coverImage.name}
-                  </p>
-                )}
-              </motion.div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 1 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className='flex flex-col items-center justify-center h-80 bg-muted/30 rounded-lg border border-dashed'
-              >
-                <p className='text-muted-foreground'>
-                  Select or upload a cover to see preview
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
+                            <div className="grid grid-cols-3 gap-2 mt-4">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => updateCoverOptions({ layout: 'left' })}
+                                    className={cn(state.book.coverOptions?.layout === 'left' && "bg-primary/10 border-primary")}
+                                >
+                                    Left
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => updateCoverOptions({ layout: 'center' })}
+                                    className={cn(state.book.coverOptions?.layout === 'center' && "bg-primary/10 border-primary")}
+                                >
+                                    Center
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => updateCoverOptions({ layout: 'right' })}
+                                    className={cn(state.book.coverOptions?.layout === 'right' && "bg-primary/10 border-primary")}
+                                >
+                                    Right
+                                </Button>
+                            </div>
+                        </div>
 
-      <div className='flex justify-between max-w-6xl mx-auto'>
-        <Button
-          variant='outline'
-          onClick={() => setCurrentStep('chapters')}
-          className='px-6'
-        >
-          <ArrowLeft className='h-4 w-4 mr-2' />
-          Back
-        </Button>
-        <Button
-          onClick={() => setCurrentStep('preview')}
-          disabled={!state.book.coverImage}
-          className='px-6'
-        >
-          Continue to Preview
-          <ArrowRight className='h-4 w-4 ml-2' />
-        </Button>
-      </div>
-    </motion.div>
-  );
+                         <div className="h-px bg-border" />
+
+                         {/* Colors */}
+                         <div className="space-y-3">
+                             <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold">Text Colors</Label>
+                             <div className="grid grid-cols-2 gap-4">
+                                 <div className="space-y-1">
+                                     <Label className="text-xs">Title</Label>
+                                     <div className="flex items-center gap-2">
+                                         <input 
+                                             type="color" 
+                                             value={state.book.coverOptions?.titleColor}
+                                             onChange={(e) => updateCoverOptions({ titleColor: e.target.value })}
+                                             className="h-8 w-8 rounded overflow-hidden cursor-pointer border p-0"
+                                         />
+                                         <span className="text-xs font-mono text-muted-foreground">{state.book.coverOptions?.titleColor}</span>
+                                     </div>
+                                 </div>
+                                 <div className="space-y-1">
+                                     <Label className="text-xs">Subtitle</Label>
+                                     <div className="flex items-center gap-2">
+                                         <input 
+                                             type="color" 
+                                             value={state.book.coverOptions?.subtitleColor}
+                                             onChange={(e) => updateCoverOptions({ subtitleColor: e.target.value })}
+                                             className="h-8 w-8 rounded overflow-hidden cursor-pointer border p-0"
+                                         />
+                                          <span className="text-xs font-mono text-muted-foreground">{state.book.coverOptions?.subtitleColor}</span>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                    </div>
+                </Card>
+            </div>
+        </motion.div>
+    );
 };
 
 export default CoverDesignStep;
