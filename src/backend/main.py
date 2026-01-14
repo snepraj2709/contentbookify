@@ -74,12 +74,27 @@ class Chapter(BaseModel):
     content: str | None = None
     media: list[Media] | None = None
 
+class BookCover(BaseModel):
+    url: str
+    name: str | None = None
+    type: str | None = None
+    id: str | None = None
+
+class CoverOptions(BaseModel):
+    titleColor: str | None = "#000000"
+    subtitleColor: str | None = "#333333"
+    authorColor: str | None = "#666666"
+    fontFamily: str | None = "serif"
+    layout: str | None = "center"
+
 class Book(BaseModel):
     title: str
     subtitle: str | None = None
     author: str
     chapters: list[Chapter]
     format: str
+    coverImage: BookCover | None = None
+    coverOptions: CoverOptions | None = None
 
 class GenerateBookRequest(BaseModel):
     book: Book
