@@ -108,7 +108,7 @@ def main():
 
     open("book.html","w",encoding="utf-8").write(book_html)
     print("Generated book.html")
-    subprocess.run(["weasyprint","book.html","ssp_book.pdf"])
+    subprocess.run(["weasyprint","--allowed-protocols=file,http,https","book.html","ssp_book.pdf"])
 
     print("Generated ssp_book.pdf")
 
