@@ -46,7 +46,7 @@ ARTICLES = [
 
 BOOK_CSS = """
 @page {
-  size: A5;
+  size: A4;
   margin: 2cm;
 }
 
