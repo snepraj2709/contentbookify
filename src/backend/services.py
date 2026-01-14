@@ -219,7 +219,7 @@ def normalize_to_book_html(html_content, title, temp_dir):
 
     return f"<h1>{title}</h1>\n<div>{html_content}</div>"
 
-from weasyprint import HTML
+from weasyprint import HTML, CSS
 
 def generate_book_pdf(book_data: dict) -> dict:
     """Generates a PDF for the book using the robust Fetch -> Clean -> Normalize pipeline."""
@@ -265,6 +265,29 @@ def generate_book_pdf(book_data: dict) -> dict:
             if book_data.get('coverImage'):
                 cover_image_url = book_data['coverImage'].get('url')
             
+            if cover_image_url:
+                try:
+                    images_dir = os.path.join(temp_dir, "images")
+                    os.makedirs(images_dir, exist_ok=True)
+                    
+                    # Hash filename
+                    name = hashlib.md5(cover_image_url.encode()).hexdigest() + ".jpg"
+                    path = os.path.join(images_dir, name)
+                    
+                    if not os.path.exists(path):
+                        response = requests.get(cover_image_url, timeout=10)
+                        if response.status_code == 200:
+                            with open(path, "wb") as f:
+                                f.write(response.content)
+                            cover_image_url = f"images/{name}"
+                        else:
+                            logger.warning(f"Failed to download cover image: {response.status_code}")
+                    else:
+                         cover_image_url = f"images/{name}"
+                         
+                except Exception as e:
+                    logger.error(f"Error localizing cover image: {e}")
+            
             cover_options = book_data.get('coverOptions', {})
             layout = cover_options.get('layout', 'center')
             font_family_opt = cover_options.get('fontFamily', 'serif')
@@ -291,64 +314,97 @@ def generate_book_pdf(book_data: dict) -> dict:
             cover_css = ""
             if cover_image_url:
                 cover_css = f"""
-                .title-page {{
-                    background-image: url('{cover_image_url}');
-                    background-size: cover;
-                    background-position: center;
-                    height: 100vh;
-                    width: 100%;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: flex-end;
-                    align-items: {align_items};
-                    text-align: {text_align};
+                @page {{
+                    size: A4;
                     margin: 0;
-                    padding: 40px;
-                    box-sizing: border-box;
-                    page-break-after: always;
+                    background: url('{cover_image_url}') center / cover no-repeat;
                 }}
-                .title-container {{ width: 100%; margin-bottom: 60px; }}
+                body {{
+                    margin: 0;
+                    height: 100%;
+                }}
                 """
             else:
-                cover_css = """
-                .title-page { text-align: center; margin-top: 150px; margin-bottom: 60px; page-break-after: always; }
+                 cover_css = """
+                    @page { size: A4; margin: 2cm; }
+                    .title-page { text-align: center; margin-top: 150px; margin-bottom: 60px; page-break-after: always; }
                 """
 
-            cover_html = f"""
-            <div class="title-page">
-                <div class="title-container">
-                    <div class="book-title" style="font-family: {font_family}; font-size: 48px; font-weight: bold; margin-bottom: 10px; color: {title_color}; { 'text-shadow: 2px 2px 10px rgba(0,0,0,0.5);' if cover_image_url else '' }">{title_text}</div>
-                    { f'<div class="book-subtitle" style="font-family: {font_family}; font-size: 24px; font-weight: 500; margin-bottom: 40px; color: {subtitle_color}; { "text-shadow: 1px 1px 5px rgba(0,0,0,0.5);" if cover_image_url else "" }">{subtitle}</div>' if subtitle else '' }
-                    <div class="book-author" style="font-size: 18px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; color: {author_color}; { 'text-shadow: 1px 1px 3px rgba(0,0,0,0.5);' if cover_image_url else '' }">{author_text}</div>
-                </div>
-            </div>
-            """
+            cover_html = ""
+            if cover_image_url:
+                 # Minimal HTML, mostly styled by body/flex
+                 cover_html = f"""
+                    <!DOCTYPE html>
+                    <html>
+                    <head><meta charset="utf-8"></head>
+                    <body>
+                    <div class="title-page" style="
+                        height: 100vh;
+                        width: 100%;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: flex-end;
+                        align-items: {align_items};
+                        text-align: {text_align};
+                        padding: 80px;
+                        box-sizing: border-box;
+                    ">
+                        <div class="title-container" style="width: 100%;">
+                            <div class="book-title" style="font-family: {font_family}; font-size: 48px; font-weight: bold; margin-bottom: 10px; color: {title_color}; text-shadow: 2px 2px 10px rgba(0,0,0,0.5);">{title_text}</div>
+                            { f'<div class="book-subtitle" style="font-family: {font_family}; font-size: 24px; font-weight: 500; margin-bottom: 40px; color: {subtitle_color}; text-shadow: 1px 1px 5px rgba(0,0,0,0.5);">{subtitle}</div>' if subtitle else '' }
+                            <div class="book-author" style="font-size: 18px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; color: {author_color}; text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">{author_text}</div>
+                        </div>
+                    </div>
+                    </body>
+                    </html>
+                 """
+            else:
+                 cover_html = f"""
+                    <!DOCTYPE html>
+                    <html>
+                    <head><meta charset="utf-8">
+                    <style>body {{ font-family: {font_family}; }} </style>
+                    </head>
+                    <body>
+                    <div class="title-page">
+                        <div class="book-title" style="font-size: 48px; font-weight: bold; margin-bottom: 10px; color: {title_color};">{title_text}</div>
+                        { f'<div class="book-subtitle" style="font-size: 24px; margin-bottom: 40px; color: {subtitle_color};">{subtitle}</div>' if subtitle else '' }
+                        <div class="book-author" style="font-size: 18px; text-transform: uppercase; margin-bottom: 60px; color: {author_color};">{author_text}</div>
+                    </div>
+                    </body>
+                    </html>
+                 """
+
+            pdf_path = os.path.join(temp_dir, "book.pdf")
             
-            # Combine everything
+            # 1. Render Cover
+            HTML(string=cover_html, base_url=temp_dir).write_pdf(
+                pdf_path,
+                presentational_hints=True,
+                stylesheets=[CSS(string=cover_css)]
+            )
+            
+            # 2. Render Book Content (Append)
             book_html = f"""
             <html>
             <head>
                 <meta charset="utf-8">
-                <style>
-                    {BOOK_CSS}
-                    {cover_css}
-                    @page :first {{ margin: 0; }}
-                </style>
+                <style>{BOOK_CSS}</style>
             </head>
             <body>
-            {cover_html}
             {''.join(processed_chapters)}
             </body></html>
             """
             
             book_html_path = os.path.join(temp_dir, "book.html")
             with open(book_html_path, "w", encoding="utf-8") as f:
-                f.write(book_html)
-            
-            pdf_path = os.path.join(temp_dir, "book.pdf")
-            
-            # Generate PDF using WeasyPrint (Library direct call)
-            HTML(book_html_path).write_pdf(pdf_path)
+                f.write(book_html)          
+            HTML(book_html_path, base_url=temp_dir).write_pdf(
+                pdf_path,
+                presentational_hints=True,
+                stylesheets=[CSS(string=BOOK_CSS)],
+                append=True
+            )
             
             # Read back
             with open(pdf_path, "rb") as f:
