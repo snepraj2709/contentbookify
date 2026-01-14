@@ -7,7 +7,6 @@ import { ArrowLeft, Book, Download, FileText, Loader2, Share2, Star, CheckCircle
 import { useBook } from '@/context/BookContext';
 import { useToast } from '@/components/ui/use-toast';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 const PreviewDownloadStep: React.FC = () => {
