@@ -20,7 +20,6 @@ load_dotenv(dotenv_path)
 
 # Access the key
 OPENAI_API_KEY = os.getenv("VITE_OPENAI_API_KEY")
-API_KEY = os.getenv("VITE_PDFSHIFT_API_KEY")
 
 # Initialize OpenAI Client
 client = None
@@ -102,30 +101,20 @@ def generate_chapter_summary(title: str, content: str) -> str:
         logger.error(f"Error generating summary: {e}")
         return "Failed to generate summary."
 
+from weasyprint import HTML
+
 def generate_book_pdf(book_data: dict) -> dict:
-    """Generates a PDF for the book using PDFShift."""
+    """Generates a PDF for the book using WeasyPrint (local generation)."""
     try:
-        if not API_KEY:
-            raise Exception("PDFSHIFT_API_KEY not found in environment variables")
-            
         logger.info(f"Generating PDF for book: {book_data.get('title')}")
-        
         
         html_content = generate_html_content(book_data)
         
-        response = requests.post(
-            "https://api.pdfshift.io/v3/convert/pdf",
-            auth=("api", API_KEY),
-            json={"source": html_content, "sandbox": True}, 
-            timeout=60
-        )
+        # Generate PDF using WeasyPrint
+        pdf_bytes = HTML(string=html_content).write_pdf()
         
-        if response.status_code != 200:
-            raise Exception(f"PDFShift API Error: {response.text}")
-            
         # Return base64 encoded content
-        pdf_content = response.content
-        base64_content = base64.b64encode(pdf_content).decode('utf-8')
+        base64_content = base64.b64encode(pdf_bytes).decode('utf-8')
         
         return {
             "success": True,
