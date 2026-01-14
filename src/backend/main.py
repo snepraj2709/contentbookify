@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException
-from models import save_book_cover
 from services import generate_book_cover
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,13 +38,9 @@ async def create_book_cover(request: CoverRequest):
         # Generate book cover
         cover_url = generate_book_cover(request.prompt)
 
-        # Save cover to Supabase
-        response = save_book_cover(request.prompt, cover_url)
-
         return {
             "message": "Book cover generated successfully",
             "cover_url": cover_url,
-            "db_response": response
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

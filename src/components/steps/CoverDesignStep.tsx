@@ -146,7 +146,7 @@ const CoverDesignStep: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className='w-full max-w-7xl mx-auto h-[85vh] flex flex-col'
+            className='w-full max-w-7xl mx-auto lg:h-[85vh] h-auto flex flex-col'
         >
             <div className='flex items-center justify-between mb-6 shrink-0'>
                 <div>
@@ -163,9 +163,9 @@ const CoverDesignStep: React.FC = () => {
                 </div>
             </div>
 
-            <div className='flex-1 grid grid-cols-1 md:grid-cols-12 gap-6 min-h-0'>
+            <div className='flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0'>
                 {/* LEFT PANEL: RESOURCES */}
-                <Card className='md:col-span-3 flex flex-col overflow-hidden'>
+                <Card className='lg:col-span-3 flex flex-col lg:overflow-hidden h-[500px] lg:h-auto'>
                     <Tabs defaultValue="templates" className="flex-1 flex flex-col">
                         <div className="p-4 border-b">
                             <TabsList className="w-full grid grid-cols-3">
@@ -266,7 +266,7 @@ const CoverDesignStep: React.FC = () => {
                 </Card>
 
                 {/* CENTER PANEL: PREVIEW */}
-                <div className='md:col-span-6 flex items-center justify-center bg-muted/30 rounded-xl relative overflow-hidden p-8'>
+                <div className='lg:col-span-6 flex items-center justify-center bg-muted/30 rounded-xl relative overflow-hidden p-8 min-h-[500px] lg:min-h-0'>
                     <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-30 pointer-events-none" />
                     
                     {state.book.coverImage ? (
@@ -334,7 +334,7 @@ const CoverDesignStep: React.FC = () => {
                 </div>
 
                 {/* RIGHT PANEL: CUSTOMIZATION */}
-                <Card className='md:col-span-3 flex flex-col overflow-hidden'>
+                <Card className='lg:col-span-3 flex flex-col lg:overflow-hidden h-[500px] lg:h-auto'>
                     <div className="p-4 border-b bg-muted/10">
                         <h3 className="font-semibold flex items-center gap-2"><Palette className="h-4 w-4" /> Customization</h3>
                     </div>

@@ -127,6 +127,12 @@
     @apply bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0;
   }
 
+  /* Kill shadcn forced white text on ToggleGroupItem */
+  .data-[state=on]\:text-accent-foreground[data-state="on"] {
+    color: hsl(var(--foreground)) !important;
+  }
+
+
   /* Page Curl Animation */
   @keyframes pageCurl {
     0% { transform: rotateY(0deg); opacity: 1; }
