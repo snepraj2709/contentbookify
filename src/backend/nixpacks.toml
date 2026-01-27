@@ -1,0 +1,22 @@
+# Nixpacks configuration for Railway deployment
+# WeasyPrint requires system libraries for PDF generation
+
+[phases.setup]
+nixPkgs = [
+    "python311",
+    "gcc",
+    "pango",
+    "cairo",
+    "gdk-pixbuf",
+    "libffi",
+    "fontconfig",
+    "freetype",
+    "harfbuzz",
+    "gobject-introspection"
+]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"
