@@ -264,17 +264,32 @@ def generate_book_pdf(book_data: dict) -> dict:
             cover_image_url = None
             if book_data.get('coverImage'):
                 cover_image_url = book_data['coverImage'].get('url')
-            
+
             if cover_image_url:
                 try:
                     images_dir = os.path.join(temp_dir, "images")
                     os.makedirs(images_dir, exist_ok=True)
-                    
+
                     # Hash filename
-                    name = hashlib.md5(cover_image_url.encode()).hexdigest() + ".jpg"
+                    ext = os.path.splitext(cover_image_url)[-1] or ".jpg"
+                    if '?' in ext:
+                        ext = ext.split('?')[0]
+                    name = hashlib.md5(cover_image_url.encode()).hexdigest() + ext
                     path = os.path.join(images_dir, name)
-                    
-                    if not os.path.exists(path):
+
+                    # Check if it's a local file path
+                    if os.path.isfile(cover_image_url):
+                        # Copy local file to temp images dir
+                        shutil.copy2(cover_image_url, path)
+                        cover_image_url = f"images/{name}"
+                    elif cover_image_url.startswith('file://'):
+                        # Handle file:// URLs
+                        local_path = cover_image_url[7:]
+                        if os.path.isfile(local_path):
+                            shutil.copy2(local_path, path)
+                            cover_image_url = f"images/{name}"
+                    elif not os.path.exists(path):
+                        # Download from URL
                         response = requests.get(cover_image_url, timeout=10)
                         if response.status_code == 200:
                             with open(path, "wb") as f:
@@ -284,7 +299,7 @@ def generate_book_pdf(book_data: dict) -> dict:
                             logger.warning(f"Failed to download cover image: {response.status_code}")
                     else:
                          cover_image_url = f"images/{name}"
-                         
+
                 except Exception as e:
                     logger.error(f"Error localizing cover image: {e}")
             
@@ -311,18 +326,16 @@ def generate_book_pdf(book_data: dict) -> dict:
                  if not cover_options.get('subtitleColor'): subtitle_color = '#eee'
                  if not cover_options.get('authorColor'): author_color = '#ddd'
 
+            # Build absolute path for cover image
+            cover_image_abs_path = None
+            if cover_image_url and cover_image_url.startswith("images/"):
+                cover_image_abs_path = os.path.join(temp_dir, cover_image_url)
+
             cover_css = ""
             if cover_image_url:
-                cover_css = f"""
-                @page {{
-                    size: A4;
-                    margin: 0;
-                    background: url('{cover_image_url}') center / cover no-repeat;
-                }}
-                body {{
-                    margin: 0;
-                    height: 100%;
-                }}
+                cover_css = """
+                @page { size: A4; margin: 0; }
+                body { margin: 0; height: 100%; }
                 """
             else:
                  cover_css = """
@@ -333,71 +346,92 @@ def generate_book_pdf(book_data: dict) -> dict:
             cover_html = ""
             if cover_image_url:
                  # Cover HTML that matches the frontend preview exactly
+                 # Uses WeasyPrint-compatible CSS (no vh units, no text-shadow)
+                 # Embeds image as <img> element for reliable rendering
                  # Frontend uses: p-8 (32px), justify-end, dark overlay (bg-black/20)
-                 # Title: text-4xl (~36px), font-bold, drop-shadow-lg
-                 # Subtitle: text-lg (~18px), font-medium, drop-shadow-md, opacity-90
+                 # Title: text-4xl (~36px), font-bold
+                 # Subtitle: text-lg (~18px), font-medium, opacity-90
                  # Author: text-sm (~14px), tracking-widest, uppercase, font-semibold
                  cover_html = f"""
                     <!DOCTYPE html>
                     <html>
-                    <head><meta charset="utf-8"></head>
-                    <body style="margin: 0; height: 100%;">
-                    <!-- Dark overlay matching frontend bg-black/20 -->
-                    <div style="
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        background-color: rgba(0, 0, 0, 0.2);
-                    "></div>
-                    <!-- Text container matching frontend preview -->
-                    <div class="title-page" style="
-                        position: relative;
-                        height: 100vh;
-                        width: 100%;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: flex-end;
-                        align-items: {align_items};
-                        text-align: {text_align};
-                        padding: 32px;
-                        box-sizing: border-box;
-                    ">
-                        <div class="title-container" style="width: 100%;">
-                            <!-- Title: matching text-4xl (36px), font-bold, drop-shadow-lg -->
-                            <div class="book-title" style="
-                                font-family: {font_family};
-                                font-size: 36px;
-                                font-weight: bold;
-                                line-height: 1.1;
-                                margin-bottom: 8px;
-                                color: {title_color};
-                                text-shadow: 0 10px 15px rgba(0,0,0,0.3), 0 4px 6px rgba(0,0,0,0.2);
-                            ">{title_text}</div>
-                            <!-- Subtitle: matching text-lg (18px), font-medium, opacity-90 -->
-                            { f'''<div class="book-subtitle" style="
-                                font-family: {font_family};
-                                font-size: 18px;
-                                font-weight: 500;
-                                opacity: 0.9;
-                                margin-bottom: 8px;
-                                color: {subtitle_color};
-                                text-shadow: 0 4px 6px rgba(0,0,0,0.2);
-                            ">{subtitle}</div>''' if subtitle else '' }
-                            <!-- Author: with spacing matching pt-8 pb-4 (32px top, 16px bottom) -->
-                            <div style="padding-top: 32px; padding-bottom: 16px;">
-                                <div class="book-author" style="
-                                    font-size: 14px;
-                                    text-transform: uppercase;
-                                    letter-spacing: 0.1em;
-                                    font-weight: 600;
-                                    color: {author_color};
-                                    text-shadow: 0 4px 6px rgba(0,0,0,0.2);
-                                ">{author_text}</div>
+                    <head>
+                        <meta charset="utf-8">
+                        <style>
+                            @page {{ size: A4; margin: 0; }}
+                            html, body {{ margin: 0; padding: 0; height: 100%; }}
+                            .cover-wrapper {{
+                                position: relative;
+                                width: 210mm;
+                                height: 297mm;
+                                overflow: hidden;
+                            }}
+                            .cover-image {{
+                                position: absolute;
+                                top: 0;
+                                left: 0;
+                                width: 100%;
+                                height: 100%;
+                                object-fit: cover;
+                            }}
+                            .dark-overlay {{
+                                position: absolute;
+                                top: 0;
+                                left: 0;
+                                right: 0;
+                                bottom: 0;
+                                background-color: rgba(0, 0, 0, 0.2);
+                            }}
+                            .title-page {{
+                                position: absolute;
+                                bottom: 0;
+                                left: 0;
+                                right: 0;
+                                padding: 32px;
+                                box-sizing: border-box;
+                            }}
+                        </style>
+                    </head>
+                    <body>
+                        <div class="cover-wrapper">
+                            <!-- Cover image as background -->
+                            <img class="cover-image" src="{cover_image_url}" alt="Cover" />
+                            <!-- Dark overlay matching frontend bg-black/20 -->
+                            <div class="dark-overlay"></div>
+                            <!-- Text container positioned at bottom matching frontend preview -->
+                            <div class="title-page" style="text-align: {text_align};">
+                                <div class="title-container">
+                                    <!-- Title: matching text-4xl (36px), font-bold -->
+                                    <div class="book-title" style="
+                                        font-family: {font_family};
+                                        font-size: 36px;
+                                        font-weight: bold;
+                                        line-height: 1.1;
+                                        margin-bottom: 8px;
+                                        color: {title_color};
+                                    ">{title_text}</div>
+                                    <!-- Subtitle: matching text-lg (18px), font-medium, opacity-90 -->
+                                    { f'''<div class="book-subtitle" style="
+                                        font-family: {font_family};
+                                        font-size: 18px;
+                                        font-weight: 500;
+                                        opacity: 0.9;
+                                        margin-bottom: 8px;
+                                        color: {subtitle_color};
+                                    ">{subtitle}</div>''' if subtitle else '' }
+                                    <!-- Author: with spacing matching pt-8 pb-4 (32px top, 16px bottom) -->
+                                    <div style="padding-top: 32px; padding-bottom: 16px;">
+                                        <div class="book-author" style="
+                                            font-size: 14px;
+                                            text-transform: uppercase;
+                                            letter-spacing: 0.1em;
+                                            font-weight: 600;
+                                            color: {author_color};
+                                        ">{author_text}</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
                     </body>
                     </html>
                  """
@@ -418,16 +452,18 @@ def generate_book_pdf(book_data: dict) -> dict:
                     </html>
                  """
 
-            pdf_path = os.path.join(temp_dir, "book.pdf")
-            
+            cover_pdf_path = os.path.join(temp_dir, "cover.pdf")
+            content_pdf_path = os.path.join(temp_dir, "content.pdf")
+            final_pdf_path = os.path.join(temp_dir, "book.pdf")
+
             # 1. Render Cover
             HTML(string=cover_html, base_url=temp_dir).write_pdf(
-                pdf_path,
+                cover_pdf_path,
                 presentational_hints=True,
                 stylesheets=[CSS(string=cover_css)]
             )
-            
-            # 2. Render Book Content (Append)
+
+            # 2. Render Book Content
             book_html = f"""
             <html>
             <head>
@@ -438,19 +474,26 @@ def generate_book_pdf(book_data: dict) -> dict:
             {''.join(processed_chapters)}
             </body></html>
             """
-            
+
             book_html_path = os.path.join(temp_dir, "book.html")
             with open(book_html_path, "w", encoding="utf-8") as f:
-                f.write(book_html)          
+                f.write(book_html)
             HTML(book_html_path, base_url=temp_dir).write_pdf(
-                pdf_path,
+                content_pdf_path,
                 presentational_hints=True,
-                stylesheets=[CSS(string=BOOK_CSS)],
-                append=True
+                stylesheets=[CSS(string=BOOK_CSS)]
             )
-            
+
+            # 3. Merge Cover and Content PDFs using pypdf
+            from pypdf import PdfWriter
+            merger = PdfWriter()
+            merger.append(cover_pdf_path)
+            merger.append(content_pdf_path)
+            merger.write(final_pdf_path)
+            merger.close()
+
             # Read back
-            with open(pdf_path, "rb") as f:
+            with open(final_pdf_path, "rb") as f:
                 pdf_bytes = f.read()
                 
             base64_content = base64.b64encode(pdf_bytes).decode('utf-8')
