@@ -143,37 +143,42 @@ def fetch_clean(url):
     """
 
 def localize_images(html_content, base_url, temp_dir):
+    """Localize images with parallel downloads for speed."""
     soup = BeautifulSoup(html_content, "html.parser")
     images_dir = os.path.join(temp_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
 
+    # Collect all images to download
+    img_tasks = []
     for img in soup.find_all("img"):
         src = img.get("src")
         if not src:
             continue
-
         abs_url = urljoin(base_url, src)
-        try:
-            # Create a safe filename hash
-            name = hashlib.md5(abs_url.encode()).hexdigest() + os.path.splitext(src)[-1]
-            if not os.path.splitext(src)[-1]:
-                 name += ".jpg" # Default extension if missing
-            
-            path = os.path.join(images_dir, name)
+        ext = os.path.splitext(src)[-1] or ".jpg"
+        if '?' in ext:
+            ext = ext.split('?')[0]
+        name = hashlib.md5(abs_url.encode()).hexdigest() + ext
+        path = os.path.join(images_dir, name)
+        img_tasks.append((img, abs_url, path, name))
 
-            if not os.path.exists(path):
-                response = requests.get(abs_url, timeout=10)
-                if response.status_code == 200:
-                    with open(path, "wb") as f:
-                        f.write(response.content)
-            
-            # Update src to file path relative to the HTML file (which will be in temp_dir)
-            # WeasyPrint handles local paths well
+    # Parallel download (max 5 concurrent)
+    def download_and_save(task):
+        img, abs_url, path, name = task
+        if not os.path.exists(path):
+            content = download_image_fast(abs_url)
+            if content:
+                with open(path, "wb") as f:
+                    f.write(content)
+        return (img, name, os.path.exists(path))
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = list(executor.map(download_and_save, img_tasks))
+
+    # Update img sources
+    for img, name, success in results:
+        if success:
             img["src"] = f"images/{name}"
-            
-        except Exception as e:
-            logger.warning(f"Failed to localize image {abs_url}: {e}")
-            continue
 
     return str(soup)
 
@@ -184,42 +189,41 @@ def normalize_unicode(html_content):
     return htmlparser.unescape(html_content)
 
 def normalize_to_book_html(html_content, title, temp_dir):
-    # Create temp file in the provided temp_dir
-    temp_file_path = os.path.join(temp_dir, f"{hashlib.md5(title.encode()).hexdigest()}.html")
-    with open(temp_file_path, "w", encoding="utf-8") as f:
-        f.write(html_content)
+    """Normalize HTML content - skip pandoc for speed, use direct processing."""
+    # Extract just the body content if full HTML
+    soup = BeautifulSoup(html_content, "html.parser")
+    body = soup.find('body')
+    content = str(body) if body else html_content
 
-    out_file_path = temp_file_path.replace(".html", "_norm.html")
-    
-    # Check for pandoc
-    pandoc_cmd = "pandoc"
-    if not shutil.which("pandoc"):
-         # Try to find it if possible, or skip
-         # Assuming globally installed as per user
-         pass 
+    # Clean up common issues
+    content = ftfy.fix_text(content)
 
-    try:
-        subprocess.run([
-            pandoc_cmd, temp_file_path,
-            "--from=html",
-            "--to=html5",
-            "--standalone",
-            "--metadata=charset:utf-8",
-            "-o", out_file_path
-        ], check=True)
-        
-        if os.path.exists(out_file_path):
-             with open(out_file_path, 'r', encoding='utf-8') as f:
-                normalized_content = f.read()
-                return f"<h1>{title}</h1>\n" + normalized_content
-    except Exception as e:
-        logger.error(f"Pandoc normalization failed for {title}: {e}")
-        # Fallback to original content wrapped
-        return f"<h1>{title}</h1>\n<div>{html_content}</div>"
-
-    return f"<h1>{title}</h1>\n<div>{html_content}</div>"
+    return f"<h1>{html.escape(title)}</h1>\n<div>{content}</div>"
 
 from weasyprint import HTML, CSS
+from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
+
+# Reusable session for connection pooling
+_session = None
+def get_session():
+    global _session
+    if _session is None:
+        _session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10)
+        _session.mount('http://', adapter)
+        _session.mount('https://', adapter)
+    return _session
+
+def download_image_fast(url, timeout=10):
+    """Fast image download with connection pooling."""
+    try:
+        resp = get_session().get(url, timeout=timeout)
+        if resp.status_code == 200:
+            return resp.content
+    except Exception as e:
+        logger.warning(f"Failed to download {url}: {e}")
+    return None
 
 def generate_book_pdf(book_data: dict) -> dict:
     """Generates a PDF for the book using the robust Fetch -> Clean -> Normalize pipeline."""
@@ -289,14 +293,14 @@ def generate_book_pdf(book_data: dict) -> dict:
                             shutil.copy2(local_path, path)
                             cover_image_url = f"images/{name}"
                     elif not os.path.exists(path):
-                        # Download from URL
-                        response = requests.get(cover_image_url, timeout=10)
-                        if response.status_code == 200:
+                        # Download from URL (using fast session)
+                        content = download_image_fast(cover_image_url)
+                        if content:
                             with open(path, "wb") as f:
-                                f.write(response.content)
+                                f.write(content)
                             cover_image_url = f"images/{name}"
                         else:
-                            logger.warning(f"Failed to download cover image: {response.status_code}")
+                            logger.warning(f"Failed to download cover image")
                     else:
                          cover_image_url = f"images/{name}"
 
@@ -326,171 +330,103 @@ def generate_book_pdf(book_data: dict) -> dict:
                  if not cover_options.get('subtitleColor'): subtitle_color = '#eee'
                  if not cover_options.get('authorColor'): author_color = '#ddd'
 
-            # Build absolute path for cover image
-            cover_image_abs_path = None
-            if cover_image_url and cover_image_url.startswith("images/"):
-                cover_image_abs_path = os.path.join(temp_dir, cover_image_url)
-
-            cover_css = ""
-            if cover_image_url:
-                cover_css = """
-                @page { size: A4; margin: 0; }
-                body { margin: 0; height: 100%; }
-                """
-            else:
-                 cover_css = """
-                    @page { size: A4; margin: 2cm; }
-                    .title-page { text-align: center; margin-top: 150px; margin-bottom: 60px; page-break-after: always; }
-                """
-
-            cover_html = ""
-            if cover_image_url:
-                 # Cover HTML that matches the frontend preview exactly
-                 # Uses WeasyPrint-compatible CSS (no vh units, no text-shadow)
-                 # Embeds image as <img> element for reliable rendering
-                 # Frontend uses: p-8 (32px), justify-end, dark overlay (bg-black/20)
-                 # Title: text-4xl (~36px), font-bold
-                 # Subtitle: text-lg (~18px), font-medium, opacity-90
-                 # Author: text-sm (~14px), tracking-widest, uppercase, font-semibold
-                 cover_html = f"""
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <style>
-                            @page {{ size: A4; margin: 0; }}
-                            html, body {{ margin: 0; padding: 0; height: 100%; }}
-                            .cover-wrapper {{
-                                position: relative;
-                                width: 210mm;
-                                height: 297mm;
-                                overflow: hidden;
-                            }}
-                            .cover-image {{
-                                position: absolute;
-                                top: 0;
-                                left: 0;
-                                width: 100%;
-                                height: 100%;
-                                object-fit: cover;
-                            }}
-                            .dark-overlay {{
-                                position: absolute;
-                                top: 0;
-                                left: 0;
-                                right: 0;
-                                bottom: 0;
-                                background-color: rgba(0, 0, 0, 0.2);
-                            }}
-                            .title-page {{
-                                position: absolute;
-                                bottom: 0;
-                                left: 0;
-                                right: 0;
-                                padding: 32px;
-                                box-sizing: border-box;
-                            }}
-                        </style>
-                    </head>
-                    <body>
-                        <div class="cover-wrapper">
-                            <!-- Cover image as background -->
-                            <img class="cover-image" src="{cover_image_url}" alt="Cover" />
-                            <!-- Dark overlay matching frontend bg-black/20 -->
-                            <div class="dark-overlay"></div>
-                            <!-- Text container positioned at bottom matching frontend preview -->
-                            <div class="title-page" style="text-align: {text_align};">
-                                <div class="title-container">
-                                    <!-- Title: matching text-4xl (36px), font-bold -->
-                                    <div class="book-title" style="
-                                        font-family: {font_family};
-                                        font-size: 36px;
-                                        font-weight: bold;
-                                        line-height: 1.1;
-                                        margin-bottom: 8px;
-                                        color: {title_color};
-                                    ">{title_text}</div>
-                                    <!-- Subtitle: matching text-lg (18px), font-medium, opacity-90 -->
-                                    { f'''<div class="book-subtitle" style="
-                                        font-family: {font_family};
-                                        font-size: 18px;
-                                        font-weight: 500;
-                                        opacity: 0.9;
-                                        margin-bottom: 8px;
-                                        color: {subtitle_color};
-                                    ">{subtitle}</div>''' if subtitle else '' }
-                                    <!-- Author: with spacing matching pt-8 pb-4 (32px top, 16px bottom) -->
-                                    <div style="padding-top: 32px; padding-bottom: 16px;">
-                                        <div class="book-author" style="
-                                            font-size: 14px;
-                                            text-transform: uppercase;
-                                            letter-spacing: 0.1em;
-                                            font-weight: 600;
-                                            color: {author_color};
-                                        ">{author_text}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </body>
-                    </html>
-                 """
-            else:
-                 cover_html = f"""
-                    <!DOCTYPE html>
-                    <html>
-                    <head><meta charset="utf-8">
-                    <style>body {{ font-family: {font_family}; }} </style>
-                    </head>
-                    <body>
-                    <div class="title-page">
-                        <div class="book-title" style="font-size: 48px; font-weight: bold; margin-bottom: 10px; color: {title_color};">{title_text}</div>
-                        { f'<div class="book-subtitle" style="font-size: 24px; margin-bottom: 40px; color: {subtitle_color};">{subtitle}</div>' if subtitle else '' }
-                        <div class="book-author" style="font-size: 18px; text-transform: uppercase; margin-bottom: 60px; color: {author_color};">{author_text}</div>
-                    </div>
-                    </body>
-                    </html>
-                 """
-
-            cover_pdf_path = os.path.join(temp_dir, "cover.pdf")
-            content_pdf_path = os.path.join(temp_dir, "content.pdf")
             final_pdf_path = os.path.join(temp_dir, "book.pdf")
 
-            # 1. Render Cover
-            HTML(string=cover_html, base_url=temp_dir).write_pdf(
-                cover_pdf_path,
-                presentational_hints=True,
-                stylesheets=[CSS(string=cover_css)]
-            )
+            # Combined HTML with cover as first page, then content
+            # Using @page for cover, named page for content
+            combined_css = f"""
+            @page cover {{
+                size: A4;
+                margin: 0;
+            }}
+            @page content {{
+                size: A4;
+                margin: 2cm;
+            }}
+            .cover-wrapper {{
+                page: cover;
+                position: relative;
+                width: 210mm;
+                height: 297mm;
+                overflow: hidden;
+                page-break-after: always;
+            }}
+            .cover-image {{
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }}
+            .dark-overlay {{
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background-color: rgba(0, 0, 0, 0.2);
+            }}
+            .title-page {{
+                position: absolute;
+                bottom: 0; left: 0; right: 0;
+                padding: 32px;
+                box-sizing: border-box;
+            }}
+            .content-section {{
+                page: content;
+            }}
+            {BOOK_CSS}
+            """
 
-            # 2. Render Book Content
-            book_html = f"""
+            # Build cover section
+            cover_section = ""
+            if cover_image_url:
+                cover_section = f"""
+                <div class="cover-wrapper">
+                    <img class="cover-image" src="{cover_image_url}" alt="Cover" />
+                    <div class="dark-overlay"></div>
+                    <div class="title-page" style="text-align: {text_align};">
+                        <div class="title-container">
+                            <div style="font-family: {font_family}; font-size: 36px; font-weight: bold; line-height: 1.1; margin-bottom: 8px; color: {title_color};">{title_text}</div>
+                            {f'<div style="font-family: {font_family}; font-size: 18px; font-weight: 500; opacity: 0.9; margin-bottom: 8px; color: {subtitle_color};">{subtitle}</div>' if subtitle else ''}
+                            <div style="padding-top: 32px; padding-bottom: 16px;">
+                                <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; color: {author_color};">{author_text}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                """
+            else:
+                cover_section = f"""
+                <div class="cover-wrapper" style="background: white; display: flex; align-items: center; justify-content: center;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 48px; font-weight: bold; margin-bottom: 10px; color: {title_color};">{title_text}</div>
+                        {f'<div style="font-size: 24px; margin-bottom: 40px; color: {subtitle_color};">{subtitle}</div>' if subtitle else ''}
+                        <div style="font-size: 18px; text-transform: uppercase; color: {author_color};">{author_text}</div>
+                    </div>
+                </div>
+                """
+
+            # Combined HTML document
+            combined_html = f"""
+            <!DOCTYPE html>
             <html>
             <head>
                 <meta charset="utf-8">
-                <style>{BOOK_CSS}</style>
+                <style>{combined_css}</style>
             </head>
             <body>
-            {''.join(processed_chapters)}
-            </body></html>
+                {cover_section}
+                <div class="content-section">
+                    {''.join(processed_chapters)}
+                </div>
+            </body>
+            </html>
             """
 
-            book_html_path = os.path.join(temp_dir, "book.html")
-            with open(book_html_path, "w", encoding="utf-8") as f:
-                f.write(book_html)
-            HTML(book_html_path, base_url=temp_dir).write_pdf(
-                content_pdf_path,
-                presentational_hints=True,
-                stylesheets=[CSS(string=BOOK_CSS)]
+            # Single PDF render (faster than render + merge)
+            HTML(string=combined_html, base_url=temp_dir).write_pdf(
+                final_pdf_path,
+                presentational_hints=True
             )
-
-            # 3. Merge Cover and Content PDFs using pypdf
-            from pypdf import PdfWriter
-            merger = PdfWriter()
-            merger.append(cover_pdf_path)
-            merger.append(content_pdf_path)
-            merger.write(final_pdf_path)
-            merger.close()
 
             # Read back
             with open(final_pdf_path, "rb") as f:
