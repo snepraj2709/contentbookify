@@ -332,13 +332,28 @@ def generate_book_pdf(book_data: dict) -> dict:
 
             cover_html = ""
             if cover_image_url:
-                 # Minimal HTML, mostly styled by body/flex
+                 # Cover HTML that matches the frontend preview exactly
+                 # Frontend uses: p-8 (32px), justify-end, dark overlay (bg-black/20)
+                 # Title: text-4xl (~36px), font-bold, drop-shadow-lg
+                 # Subtitle: text-lg (~18px), font-medium, drop-shadow-md, opacity-90
+                 # Author: text-sm (~14px), tracking-widest, uppercase, font-semibold
                  cover_html = f"""
                     <!DOCTYPE html>
                     <html>
                     <head><meta charset="utf-8"></head>
-                    <body>
+                    <body style="margin: 0; height: 100%;">
+                    <!-- Dark overlay matching frontend bg-black/20 -->
+                    <div style="
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background-color: rgba(0, 0, 0, 0.2);
+                    "></div>
+                    <!-- Text container matching frontend preview -->
                     <div class="title-page" style="
+                        position: relative;
                         height: 100vh;
                         width: 100%;
                         display: flex;
@@ -346,13 +361,41 @@ def generate_book_pdf(book_data: dict) -> dict:
                         justify-content: flex-end;
                         align-items: {align_items};
                         text-align: {text_align};
-                        padding: 80px;
+                        padding: 32px;
                         box-sizing: border-box;
                     ">
                         <div class="title-container" style="width: 100%;">
-                            <div class="book-title" style="font-family: {font_family}; font-size: 48px; font-weight: bold; margin-bottom: 10px; color: {title_color}; text-shadow: 2px 2px 10px rgba(0,0,0,0.5);">{title_text}</div>
-                            { f'<div class="book-subtitle" style="font-family: {font_family}; font-size: 24px; font-weight: 500; margin-bottom: 40px; color: {subtitle_color}; text-shadow: 1px 1px 5px rgba(0,0,0,0.5);">{subtitle}</div>' if subtitle else '' }
-                            <div class="book-author" style="font-size: 18px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; color: {author_color}; text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">{author_text}</div>
+                            <!-- Title: matching text-4xl (36px), font-bold, drop-shadow-lg -->
+                            <div class="book-title" style="
+                                font-family: {font_family};
+                                font-size: 36px;
+                                font-weight: bold;
+                                line-height: 1.1;
+                                margin-bottom: 8px;
+                                color: {title_color};
+                                text-shadow: 0 10px 15px rgba(0,0,0,0.3), 0 4px 6px rgba(0,0,0,0.2);
+                            ">{title_text}</div>
+                            <!-- Subtitle: matching text-lg (18px), font-medium, opacity-90 -->
+                            { f'''<div class="book-subtitle" style="
+                                font-family: {font_family};
+                                font-size: 18px;
+                                font-weight: 500;
+                                opacity: 0.9;
+                                margin-bottom: 8px;
+                                color: {subtitle_color};
+                                text-shadow: 0 4px 6px rgba(0,0,0,0.2);
+                            ">{subtitle}</div>''' if subtitle else '' }
+                            <!-- Author: with spacing matching pt-8 pb-4 (32px top, 16px bottom) -->
+                            <div style="padding-top: 32px; padding-bottom: 16px;">
+                                <div class="book-author" style="
+                                    font-size: 14px;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.1em;
+                                    font-weight: 600;
+                                    color: {author_color};
+                                    text-shadow: 0 4px 6px rgba(0,0,0,0.2);
+                                ">{author_text}</div>
+                            </div>
                         </div>
                     </div>
                     </body>
