@@ -255,11 +255,11 @@ def generate_book_pdf(book_data: dict) -> dict:
                     logger.error(f"Error processing chapter {title} ({url}): {e}")
                     processed_chapters.append(f"<h1>{title}</h1>\n<p>Error processing content from {url}</p>")
 
-            
+
             # --- Cover Page Logic ---
-            title_text = html.escape(book_data.get('title', 'Untitled'))
-            subtitle = html.escape(book_data.get('subtitle', ''))
-            author_text = html.escape(book_data.get('author', 'Unknown Author'))
+            title_text = html.escape(book_data.get('title') or 'Untitled')
+            subtitle = html.escape(book_data.get('subtitle') or '')
+            author_text = html.escape(book_data.get('author') or 'Unknown Author')
             
             cover_image_url = None
             if book_data.get('coverImage'):
