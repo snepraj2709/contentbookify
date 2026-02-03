@@ -18,7 +18,10 @@ nixPkgs = [
 ]
 
 [phases.install]
-cmds = ["pip install --break-system-packages -r requirements.txt"]
+cmds = [
+    "pip install --break-system-packages -r requirements.txt",
+    "python - <<'PY'\nimport glob\nimport os\n\nlinks = {\n    'libgobject-2.0-0': 'libgobject-2.0.so.0',\n    'libpango-1.0-0': 'libpango-1.0.so.0',\n    'libpangoft2-1.0-0': 'libpangoft2-1.0.so.0',\n    'libpangocairo-1.0-0': 'libpangocairo-1.0.so.0',\n    'libgdk_pixbuf-2.0-0': 'libgdk_pixbuf-2.0.so.0',\n    'libharfbuzz-0': 'libharfbuzz.so.0',\n    'libcairo-2': 'libcairo.so.2',\n    'libfontconfig-1': 'libfontconfig.so.1',\n    'libfreetype-6': 'libfreetype.so.6',\n    'libffi.so.8': 'libffi.so.8',\n}\n\nbase = '/app/.libs'\nos.makedirs(base, exist_ok=True)\n\nfor link, soname in links.items():\n    paths = glob.glob(f'/nix/store/*/lib/{soname}')\n    if not paths:\n        print(f'WARN: {soname} not found')\n        continue\n    target = paths[0]\n    link_path = os.path.join(base, link)\n    if os.path.islink(link_path) or os.path.exists(link_path):\n        try:\n            os.remove(link_path)\n        except Exception:\n            pass\n    try:\n        os.symlink(target, link_path)\n        print(f'linked {link} -> {target}')\n    except Exception as e:\n        print(f'WARN: could not link {link}: {e}')\nPY"
+]
 
 [start]
-cmd = "python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"
+cmd = "LD_LIBRARY_PATH=/app/.libs:$LD_LIBRARY_PATH python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"

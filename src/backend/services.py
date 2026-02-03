@@ -229,6 +229,36 @@ def generate_book_pdf(book_data: dict) -> dict:
     """Generates a PDF for the book using the robust Fetch -> Clean -> Normalize pipeline."""
     try:
         try:
+            import ctypes.util
+            import os
+
+            original_find_library = ctypes.util.find_library
+
+            def patched_find_library(name: str):
+                lib_dir = os.environ.get("WEASYPRINT_LIB_DIR", "/app/.libs")
+                if lib_dir and os.path.isdir(lib_dir):
+                    direct = os.path.join(lib_dir, name)
+                    if os.path.exists(direct):
+                        return direct
+                    bases = [
+                        name,
+                        f"lib{name}",
+                        f"lib{name}-0",
+                        f"lib{name}-1",
+                        f"{name}-0",
+                        f"{name}-1",
+                    ]
+                    for base in bases:
+                        for suffix in ("", ".so", ".so.0", ".so.1", ".so.2"):
+                            candidate = os.path.join(lib_dir, f"{base}{suffix}")
+                            if os.path.exists(candidate):
+                                return candidate
+                    for fname in os.listdir(lib_dir):
+                        if name in fname:
+                            return os.path.join(lib_dir, fname)
+                return original_find_library(name)
+
+            ctypes.util.find_library = patched_find_library
             from weasyprint import HTML
         except Exception as e:
             logger.error(f"WeasyPrint import failed: {e}")
