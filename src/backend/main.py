@@ -21,7 +21,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:8080",
         "http://localhost:8081",
-        "https://contentbookify.vercel.app/",
+        "https://contentbookify.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
