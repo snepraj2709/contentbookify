@@ -18,7 +18,11 @@ app = FastAPI()
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],  # Frontend URL
+    allow_origins=[
+        "http://localhost:8080",
+        "http://localhost:8081",
+        "https://contentbookify.vercel.app/",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

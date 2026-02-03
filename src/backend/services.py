@@ -23,9 +23,10 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# Load the .env file two folders behind
-dotenv_path = Path(__file__).resolve().parents[2] / ".env"
-load_dotenv(dotenv_path)
+# Load local .env if present (safe for prod where it doesn't exist)
+dotenv_path = Path(__file__).resolve().parent / ".env"
+if dotenv_path.exists():
+    load_dotenv(dotenv_path)
 
 # Access the key
 OPENAI_API_KEY = os.getenv("VITE_OPENAI_API_KEY")
@@ -200,7 +201,6 @@ def normalize_to_book_html(html_content, title, temp_dir):
 
     return f"<h1>{html.escape(title)}</h1>\n<div>{content}</div>"
 
-from weasyprint import HTML, CSS
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 
@@ -228,6 +228,12 @@ def download_image_fast(url, timeout=10):
 def generate_book_pdf(book_data: dict) -> dict:
     """Generates a PDF for the book using the robust Fetch -> Clean -> Normalize pipeline."""
     try:
+        try:
+            from weasyprint import HTML
+        except Exception as e:
+            logger.error(f"WeasyPrint import failed: {e}")
+            return {"error": "PDF generation unavailable (WeasyPrint import failed).", "success": False}
+
         logger.info(f"Generating PDF for book: {book_data.get('title')}")
         
         chapters_data = book_data.get('chapters', [])
